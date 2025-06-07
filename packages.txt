@@ -1,0 +1,3 @@
+libevdev-dev
+libudev-dev
+libncurses-dev
