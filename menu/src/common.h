@@ -1,0 +1,52 @@
+#ifndef COMMON_H
+#define COMMON_H
+
+//C standard library
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
+
+
+// -- [macros] --
+
+//colours
+#define RESET   "\x1b[0m"
+#define RED     "\x1b[31m"
+#define GREEN   "\x1b[32m"
+#define YELLOW  "\x1b[33m"
+#define BLUE    "\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN    "\x1b[36m"
+#define WHITE   "\x1b[37m"
+
+//tools
+#define CLAMP(max, sz) ((max < sz) ? max : sz)
+#define FATAL_FAIL(msg) { report_error(msg); exit(-1); }
+
+
+// -- [data] --
+
+//status of subsystems
+struct subsys_state {
+    bool udev_good;
+    bool evdev_good;
+    bool controller_good;
+};
+
+
+// -- [globals] --
+
+// global error state
+extern struct subsys_state subsys_state;
+
+
+// -- [text] --
+
+//send an pretty-printed error to `stderr`
+void report_error(const char * fmt, ...);
+
+//initialise global subsystem status struct 
+void init_subsys_state();
+
+
+#endif
