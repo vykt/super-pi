@@ -3,7 +3,12 @@
 
 //external libraries
 #include <ncurses.h>
-#include <cmore.h>
+
+
+// -- [text] --
+
+//initialise ncurses global state
+void init_ncurses();
 
 
 #endif
