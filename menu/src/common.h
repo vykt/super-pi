@@ -9,6 +9,10 @@
 
 // -- [macros] --
 
+//paths DEBUG
+//#define PATH_ROMS "/superpi/rom"
+#define PATH_ROMS "/home/vykt/projects/super-pi/superpi/menu/roms"
+
 //colours
 #define RESET   "\x1b[0m"
 #define RED     "\x1b[31m"
@@ -31,6 +35,7 @@ struct subsys_state {
     bool udev_good;
     bool evdev_good;
     bool controller_good;
+    bool rom_good;
 };
 
 

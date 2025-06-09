@@ -5,9 +5,13 @@
 //system headers
 #include <unistd.h>
 
+//external libraries
+#include <cmore.h>
+
 //local headers
 #include "common.h"
 #include "input.h"
+#include "data.h"
 
 
 int main() {
@@ -18,7 +22,23 @@ int main() {
     //initialise core data
     init_subsys_state();
     init_udev();
+    init_roms();
     init_js();
+
+
+    update_roms();
+    bool start = true;
+    cm_lst_node * rom_node = rom_basenames.head;
+
+    while (rom_node != NULL
+           && (start == true || rom_node != rom_basenames.head)) {
+
+        printf("rom: %s\n", (char *) rom_node->data);
+        rom_node = rom_node->next;
+        start = false;
+    }
+    
+    sleep(100);
 
     //main loop
     prev = 0;
