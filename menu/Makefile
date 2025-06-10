@@ -6,7 +6,7 @@ CROSS=
 # generic options
 CC=${CROSS}gcc
 CFLAGS=
-LDFLAGS=-ludev -levdev -lcmore
+LDFLAGS=-ludev -levdev -lncurses -lcmore
 WARN_OPTS=-Wall -Wextra -Werror -Wno-stringop-overread
 
 # build constants

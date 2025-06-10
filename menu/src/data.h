@@ -11,7 +11,7 @@
 // -- [data] --
 
 //rom storage
-extern cm_lst rom_basenames; //type: char[NAME_MAX]
+extern cm_vct rom_basenames; //type: char[NAME_MAX]
 
 
 // -- [text] --

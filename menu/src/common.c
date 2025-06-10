@@ -32,6 +32,15 @@ void report_error(const char * fmt, ...) {
 }
 
 
+//clamp an integer between some range
+int int_clamp(int val, int min, int max) {
+
+    if (val < min) return min;
+    if (val > max) return max;
+    return val;
+}
+
+
 //initialise global subsystem status struct 
 void init_subsys_state() {
 
@@ -39,4 +48,5 @@ void init_subsys_state() {
     subsys_state.evdev_good      = true;
     subsys_state.controller_good = true;
     subsys_state.rom_good        = true;
+    subsys_state.ncurses_good    = true;
 }

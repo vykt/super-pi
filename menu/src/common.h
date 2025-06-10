@@ -24,7 +24,7 @@
 #define WHITE   "\x1b[37m"
 
 //tools
-#define CLAMP(max, sz) ((max < sz) ? max : sz)
+#define MIN(x, y) ((x < y) ? x : y)
 #define FATAL_FAIL(msg) { report_error(msg); exit(-1); }
 
 
@@ -36,6 +36,7 @@ struct subsys_state {
     bool evdev_good;
     bool controller_good;
     bool rom_good;
+    bool ncurses_good;
 };
 
 
@@ -49,6 +50,9 @@ extern struct subsys_state subsys_state;
 
 //send an pretty-printed error to `stderr`
 void report_error(const char * fmt, ...);
+
+//clamp an integer between some range
+int int_clamp(int val, int min, int max);
 
 //initialise global subsystem status struct 
 void init_subsys_state();

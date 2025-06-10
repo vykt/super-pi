@@ -19,34 +19,37 @@
 
 // -- [globals] --
 
-//cmore list of rom pathnames
-cm_lst rom_basenames;
+//cmore vector of rom pathnames
+cm_vct rom_basenames;
 
 
 // -- [text] --
 
-//initialise the global rom list
+//initialise the global ROMs vector
 void init_roms() {
 
-    cm_new_lst(&rom_basenames, sizeof(char[NAME_MAX]));
+    int ret;
+
+
+    ret = cm_new_vct(&rom_basenames, sizeof(char[NAME_MAX]));
+    if (ret != 0) FATAL_FAIL("Failed to initialise the ROM vector.");
+
     return;
 }
 
 
-//release the global rom list
+//release the global ROMs vector
 void fini_roms() {
 
-    cm_del_lst(&rom_basenames);
+    cm_del_vct(&rom_basenames);
     return;
 }
 
 
-//repopulate the rom list
+//repopulate the ROMs vector
 void update_roms() {
 
     int ret;
-    void * ret_ptr;
-    
     size_t len, path_roms_len;
 
     DIR * rom_dir;
@@ -56,16 +59,13 @@ void update_roms() {
     char pathname_buf[PATH_MAX];
 
 
-    //empty the roms list
-    ret = cm_lst_emp(&rom_basenames);
-    if (ret != 0) {
-        subsys_state.rom_good = false;
-        fini_roms();
-        init_roms();
-        return;
-    }
+    //reset error state
+    subsys_state.rom_good = true;
 
-    //open the roms directory
+    //empty the ROMs vector
+    cm_vct_emp(&rom_basenames);
+
+    //open the ROMs directory
     rom_dir = opendir(PATH_ROMS);
     if (rom_dir == NULL) {
         subsys_state.rom_good = false;
@@ -96,11 +96,11 @@ void update_roms() {
         if (len < 4) continue;
         if (strncmp(dirent->d_name + len - 4, ".sfc", NAME_MAX)) continue;
 
-        //add this basename to the rom list
-        ret_ptr = cm_lst_apd(&rom_basenames, dirent->d_name);
-        if (ret_ptr == NULL) {
+        //add this basename to the ROM vector
+        ret = cm_vct_apd(&rom_basenames, dirent->d_name);
+        if (ret != 0) {
 
-            //on failure, re-start the list
+            //on failure, re-start the vector
             subsys_state.rom_good = false;
             fini_roms();
             init_roms();

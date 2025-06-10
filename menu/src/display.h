@@ -7,8 +7,9 @@
 
 // -- [text] --
 
-//initialise ncurses global state
+//initialise & release ncurses global state
 void init_ncurses();
-
+void fini_ncurses();
+void redraw();
 
 #endif

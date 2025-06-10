@@ -12,6 +12,7 @@
 #include "common.h"
 #include "input.h"
 #include "data.h"
+#include "display.h"
 
 
 int main() {
@@ -29,6 +30,10 @@ int main() {
     update_roms();
     bool start = true;
     cm_lst_node * rom_node = rom_basenames.head;
+
+
+    init_ncurses();
+    sleep(3);
 
     while (rom_node != NULL
            && (start == true || rom_node != rom_basenames.head)) {
