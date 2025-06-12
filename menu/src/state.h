@@ -5,6 +5,11 @@
 #include <ncurses.h>
 
 
+// -- [macros] --
+
+#define MAIN_MENU_OPTS 3
+
+
 // -- [data] --
 
 enum menu_window {
@@ -33,5 +38,12 @@ struct menu_state {
 
 //initialise menu state
 void init_menu_state();
+
+//handle inputs
+void handle_activate();
+void handle_exit();
+void handle_down();
+void handle_up();
+
 
 #endif

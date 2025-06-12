@@ -35,7 +35,6 @@
 #define ERR_GENERIC "Ncurses raised an error."
 
 //main menu options
-#define MAIN_MENU_OPTS 3
 #define WIN_HDR_LEN 1
 #define WIN_FTR_LEN 4
 

@@ -18,8 +18,10 @@
 #include "input.h"
 #include "data.h"
 #include "display.h"
+#include "state.h"
 
 
+//dispatch a received input
 static void _dispatch_input(struct input_event * in_event) {
     
     //if the input is a key type
@@ -28,27 +30,19 @@ static void _dispatch_input(struct input_event * in_event) {
         switch(in_event->code) {
 
             case BTN_SOUTH:
+                handle_activate();
                 break;
 
             case BTN_EAST:
-                break;
-
-            case BTN_NORTH:
-                break;
-
-            case BTN_WEST:
-                break;
-
-            case BTN_TL:
-                break;
-
-            case BTN_TR:
+                handle_exit();
                 break;
 
             case BTN_SELECT:
+                handle_activate();
                 break;
 
             case BTN_START:
+                handle_activate();
                 break;
 
             default:
@@ -60,19 +54,11 @@ static void _dispatch_input(struct input_event * in_event) {
 
         switch(in_event->code) {
 
-            case ABS_HAT0X:
-                if (in_event->value < -0.25) {
-                    printf("-X\n");
-                } else if (in_event->value > 0.25) {
-                    printf("+X\n");
-                }
-                break;
-
             case ABS_HAT0Y:
                 if (in_event->value < -0.25) {
-                    printf("-Y\n");
+                    handle_up();
                 } else if (in_event->value > 0.25) {
-                    printf("+Y\n");
+                    handle_down();
                 }
                 break;
 
