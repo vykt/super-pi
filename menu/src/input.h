@@ -85,12 +85,6 @@ struct js_state {
 //global joystick state
 extern struct js_state js_state;
 
-//global joystick device pathnames
-extern const char * js_path[4];
-
-//global udev context
-extern struct udev * udev_ctx;
-
 
 // -- [text] --
 
@@ -105,7 +99,7 @@ void init_js();
 void update_js_state();
 
 //receive the next input event from libevdev & dispatch an action
-void process_input();
+int next_input(struct input_event * in_event);
 
 
 #endif

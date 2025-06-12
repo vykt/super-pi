@@ -29,7 +29,7 @@
 struct js_state js_state;
 
 //global joystick device pathnames
-const char * js_path[4] = {
+const char * _js_path[4] = {
     JS0_DEVFS_PATH,
     JS1_DEVFS_PATH,
     JS2_DEVFS_PATH,
@@ -37,7 +37,7 @@ const char * js_path[4] = {
 };
 
 //global udev context
-struct udev * udev_ctx;
+struct udev * _udev_ctx;
 
 
 // -- [text] --
@@ -45,8 +45,8 @@ struct udev * udev_ctx;
 //initialise global udev context
 void init_udev() {
 
-    udev_ctx = udev_new();
-    if (udev_ctx == NULL) FATAL_FAIL("Failed to create a udev context.");
+    _udev_ctx = udev_new();
+    if (_udev_ctx == NULL) FATAL_FAIL("Failed to create a udev context.");
     return;
 }
 
@@ -54,7 +54,7 @@ void init_udev() {
 //release global udev context
 void fini_udev() {
 
-    udev_unref(udev_ctx);
+    udev_unref(_udev_ctx);
     return;
 }
 
@@ -162,7 +162,7 @@ static void _update_js_devices() {
     for (int i = 0; i < 4; ++i) { js_state.js[i].is_present = false; }
 
     //perform a joystick device scan
-    js_enumerate = udev_enumerate_new(udev_ctx);
+    js_enumerate = udev_enumerate_new(_udev_ctx);
     _IF_NULL_ERR_JS_NO_CLEANUP(js_enumerate)
 
     ret = udev_enumerate_add_match_subsystem(js_enumerate, "input");
@@ -182,7 +182,7 @@ static void _update_js_devices() {
         sysfs_path = udev_list_entry_get_name(js_device_entry);
         _IF_NULL_ERR_JS_ENUM(js_devices)
 
-        js_device = udev_device_new_from_syspath(udev_ctx, sysfs_path);
+        js_device = udev_device_new_from_syspath(_udev_ctx, sysfs_path);
         _IF_NULL_ERR_JS_ENUM(js_devices)
 
         js_devfs_path = udev_device_get_devnode(js_device);
@@ -191,7 +191,7 @@ static void _update_js_devices() {
 
         //if this is one of the four joysticks
         for (int i = 0; i < 4; ++i) {
-            if (strncmp(js_devfs_path, js_path[i],
+            if (strncmp(js_devfs_path, _js_path[i],
                         strnlen(js_devfs_path, PATH_MAX)) != 0) continue;
 
             //locate the corresponding event
@@ -202,7 +202,7 @@ static void _update_js_devices() {
             parent_sysfs_path = udev_device_get_syspath(parent_device);
             _IF_NULL_ERR_JS_DEVICE(parent_sysfs_path)
 
-            parent_enumerate = udev_enumerate_new(udev_ctx);
+            parent_enumerate = udev_enumerate_new(_udev_ctx);
             _IF_NULL_ERR_JS_DEVICE(parent_enumerate)
 
             ret = udev_enumerate_add_match_subsystem(
@@ -228,7 +228,7 @@ static void _update_js_devices() {
                 _IF_NULL_ERR_PARENT_ENUM(sysfs_path)
 
                 event_device = udev_device_new_from_syspath(
-                                   udev_ctx, sysfs_path);
+                                   _udev_ctx, sysfs_path);
                 _IF_NULL_ERR_PARENT_ENUM(event_device)
 
                 sysfs_path = udev_device_get_syspath(
@@ -558,80 +558,19 @@ void update_js_state() {
 
 
 //receive the next input event from libevdev & dispatch an action
-void process_input() {
+int next_input(struct input_event * in_event) {
 
     int ret;
-    struct input_event in_event;
 
 
     //receive the next input event
     ret = libevdev_next_event(
               js_state.js[js_state.main_js_idx].evdev,
-              LIBEVDEV_READ_FLAG_NORMAL, &in_event);
+              LIBEVDEV_READ_FLAG_NORMAL, in_event);
     if (ret == -EAGAIN) {
-        return;
+        return 0;
     } else if (ret != 0) {
         js_state.input_failed = true;
-        return;
-    }
-
-    //if the input is a key type
-    if (in_event.type == EV_KEY) {
-
-        switch(in_event.code) {
-
-            case BTN_SOUTH:
-                break;
-
-            case BTN_EAST:
-                break;
-
-            case BTN_NORTH:
-                break;
-
-            case BTN_WEST:
-                break;
-
-            case BTN_TL:
-                break;
-
-            case BTN_TR:
-                break;
-
-            case BTN_SELECT:
-                break;
-
-            case BTN_START:
-                break;
-
-            default:
-                break;
-
-        } //end switch
-        
-    } else if (in_event.type == EV_ABS) {
-
-        switch(in_event.code) {
-
-            case ABS_HAT0X:
-                if (in_event.value < -0.25) {
-                    printf("-X\n");
-                } else if (in_event.value > 0.25) {
-                    printf("+X\n");
-                }
-                break;
-
-            case ABS_HAT0Y:
-                if (in_event.value < -0.25) {
-                    printf("-Y\n");
-                } else if (in_event.value > 0.25) {
-                    printf("+Y\n");
-                }
-                break;
-
-        } //end switch
-
-    } //end event type
-
-    return;
+        return 0;
+    } else { return 1; }
 }

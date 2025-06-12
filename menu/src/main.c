@@ -5,7 +5,12 @@
 //system headers
 #include <unistd.h>
 
+//kernel headers
+#include <linux/input.h>
+#include <linux/input-event-codes.h>
+
 //external libraries
+#include <libevdev-1.0/libevdev/libevdev.h>
 #include <cmore.h>
 
 //local headers
@@ -13,6 +18,68 @@
 #include "input.h"
 #include "data.h"
 #include "display.h"
+
+
+static void _dispatch_input(struct input_event * in_event) {
+    
+    //if the input is a key type
+    if (in_event->type == EV_KEY) {
+
+        switch(in_event->code) {
+
+            case BTN_SOUTH:
+                break;
+
+            case BTN_EAST:
+                break;
+
+            case BTN_NORTH:
+                break;
+
+            case BTN_WEST:
+                break;
+
+            case BTN_TL:
+                break;
+
+            case BTN_TR:
+                break;
+
+            case BTN_SELECT:
+                break;
+
+            case BTN_START:
+                break;
+
+            default:
+                break;
+
+        } //end switch
+        
+    } else if (in_event->type == EV_ABS) {
+
+        switch(in_event->code) {
+
+            case ABS_HAT0X:
+                if (in_event->value < -0.25) {
+                    printf("-X\n");
+                } else if (in_event->value > 0.25) {
+                    printf("+X\n");
+                }
+                break;
+
+            case ABS_HAT0Y:
+                if (in_event->value < -0.25) {
+                    printf("-Y\n");
+                } else if (in_event->value > 0.25) {
+                    printf("+Y\n");
+                }
+                break;
+
+        } //end switch
+
+    } //end event type
+}
 
 
 int main() {
@@ -25,11 +92,6 @@ int main() {
     init_udev();
     init_roms();
     init_js();
-
-
-    update_roms();
-    bool start = true;
-    cm_lst_node * rom_node = rom_basenames.head;
 
 
     init_ncurses();

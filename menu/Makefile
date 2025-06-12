@@ -7,7 +7,7 @@ CROSS=
 CC=${CROSS}gcc
 CFLAGS=
 LDFLAGS=-ludev -levdev -lncurses -lcmore
-WARN_OPTS=-Wall -Wextra -Werror -Wno-stringop-overread
+WARN_OPTS=-Wall -Wextra -Werror -Wno-stringop-overread -Wno-unused-function
 
 # build constants
 SRC_DIR=./src
