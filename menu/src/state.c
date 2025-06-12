@@ -24,9 +24,8 @@ void init_menu_state() {
     menu_state.main_menu_pos = 0;
 
     //set ROMs menu data
-    menu_state.roms_menu_pos = 0;
-    menu_state.roms_menu_idx = 0;
-    menu_state.roms_menu_off = 0;
+    menu_state.roms_menu_pos = -1; //"BACK"
+    menu_state.roms_menu_off = -1; //"BACK"
 
     return;
 }

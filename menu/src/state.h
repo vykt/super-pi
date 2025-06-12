@@ -25,7 +25,6 @@ struct menu_state {
 
     //ROMs menu data
     int roms_menu_pos;
-    int roms_menu_idx;
     int roms_menu_off;
 };
 

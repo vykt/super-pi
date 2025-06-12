@@ -1,7 +1,3 @@
-/*
- *  Watching paint dry: C edition.
- */
-
 //C standard library
 #include <stdbool.h>
 #include <string.h>
@@ -28,11 +24,12 @@
 
 //colours (fmt: fg:bg)
 #define WHITE_BLACK 1
-#define WHITE_GREEN 2
-#define BLACK_WHITE 3
-#define RED_WHITE   4
-#define GREEN_WHITE 5
-#define BLUE_WHITE  6
+#define WHITE_BLUE  2
+#define WHITE_RED   3
+#define BLACK_WHITE 4
+#define RED_WHITE   5
+#define GREEN_WHITE 6
+#define BLUE_WHITE  7
 
 //generic error string
 #define ERR_GENERIC "Ncurses raised an error."
@@ -87,11 +84,18 @@ struct win {
     int body_start_x;
 };
 
+/*
+ *  NOTE: The current implementation assumes the main window will never
+ *        need to scroll through the input options. This is enforced
+ *        by current minimum window size constraints.
+ */
+
 //menu selectable contents
 struct menu {
 
     cm_vct opts;
     bool is_init;
+    bool is_active;
     int scroll;
 };
 
@@ -135,7 +139,8 @@ static void _populate_colours() {
 
     //initialise global colour pairs (fmt: fg:bg)
     init_pair(WHITE_BLACK, COLOR_WHITE, COLOR_BLACK);
-    init_pair(WHITE_GREEN, COLOR_WHITE, COLOR_GREEN);
+    init_pair(WHITE_BLUE, COLOR_WHITE, COLOR_BLUE);
+    init_pair(WHITE_RED, COLOR_WHITE, COLOR_RED);
     init_pair(BLACK_WHITE, COLOR_BLACK, COLOR_WHITE);
     init_pair(RED_WHITE, COLOR_RED, COLOR_WHITE);
     init_pair(GREEN_WHITE, COLOR_GREEN, COLOR_WHITE);
@@ -583,19 +588,20 @@ static void _draw_main_menu() {
     int y, x;
     char * next_opt;
 
-    y = menu_opts_start_y;
-    x = menu_opts_start_x;
+
+    y = win.start_y;
+    x = win.start_x;
 
     //for each main menu option
     for (int i = 0; i < MAIN_MENU_OPTS; ++i) {
 
         //get the next option
-        next_opt = cm_vct_get_p(&main_menu_opts, i);
+        next_opt = cm_vct_get_p(&main_menu.opts, i);
         if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next option
-        if (disp_state.main_menu_idx == i) {
-            _draw_colour(main_win, WHITE_GREEN, y, x, next_opt);
+        if (menu_state.main_menu_pos == i) {
+            _draw_colour(main_win, WHITE_BLUE, y, x, next_opt);
         } else {
             _draw_colour(main_win, BLACK_WHITE, y, x, next_opt);
         }
@@ -608,30 +614,40 @@ static void _draw_main_menu() {
 static void _draw_roms_menu() {
 
     int y, x;
+
+    int range;
+    int effective_i;
     char * next_opt;
 
 
-    y = menu_opts_start_y;
-    x = menu_opts_start_x;
+    y = win.start_y;
+    x = win.start_x;
 
     //draw the back option
-    if (disp_state.main_menu_idx == 0) {
-        _draw_colour(main_win, WHITE_GREEN, y, x, "BACK");
+    if (menu_state.roms_menu_pos == 0) {
+        _draw_colour(main_win, WHITE_BLUE, y, x, "BACK");
     } else {
         _draw_colour(main_win, BLACK_WHITE, y, x, "BACK");
     }
 
     //for each ROM menu option
     y += 2;
-    for (int i = 0; i < menu_opts_items; ++i) {
+    range = (roms_menu.opts.len > win.body_sz_y)
+            ? win.body_sz_y : roms_menu.opts.len;
+    for (int i = 0; i < range; ++i) {
+
+        //get an i that accounts for menu scroll
+        effective_i = roms_menu.scroll + i;
 
         //get the next option
-        next_opt = cm_vct_get_p(&main_menu_opts, rom_menu_scroll_off + i);
+        next_opt = cm_vct_get_p(&main_menu.opts, effective_i);
         if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next option
-        if (disp_state.roms_menu_idx == i) {
-            _draw_colour(main_win, WHITE_GREEN, y, x, next_opt);
+        if (menu_state.roms_menu_pos == effective_i) {
+            _draw_colour(main_win,
+                         roms_menu.is_active ? WHITE_RED : WHITE_BLUE,
+                         y, x, next_opt);
         } else {
             _draw_colour(main_win, BLACK_WHITE, y, x, next_opt);
         }
@@ -640,104 +656,120 @@ static void _draw_roms_menu() {
 }
 
 
-//main window input functions
-void main_entry() {
-
-    disp_state.current_win = main_win;
-    return;
-}
-
-
-void main_exit() {
-
-    return;
-}
-
-
-void main_down() {
-
-    if (disp_state.roms_menu_idx < menu_opts_items)
-        disp_state.roms_menu_idx += 1;
-
-    return;
-}
-
-
-void main_up() {
-
-    if (disp_state.roms_menu_idx > 0)
-        disp_state.roms_menu_idx -= 1;
-
-    return;
-}
-
-
-//roms window input functions
-void roms_entry() {
-
-    //update roms
-    update_roms();
-    
-    //update state
-    disp_state.current_win   = roms_win;
-    disp_state.roms_count    = rom_basenames.len;    
-    disp_state.roms_menu_idx = 0;
-    disp_state.roms_roms_idx = 0;
-
-    return;
-}
-
-
-void roms_exit() {
-
-    return;
-}
-
-
-void roms_down() {
-
-    if (disp_state.roms_menu_idx < menu_opts_items) {
-        disp_state.roms_menu_idx += 1;
-        
-        if (disp_state.roms_roms_idx
-            == (rom_menu_scroll_off + menu_opts_items - 1))
-            rom_menu_scroll_off += 1;
-        disp_state.roms_roms_idx += 1;
-    }
-
-    return;
-}
-
-
-void roms_up() {
-
-    //I can't describe in words how fucking boring this is to write
-
-#if 0
-    if (disp_state.roms_menu_idx > 0) {
-        disp_state.roms_menu_idx -= 1;
-        if (rom_menu_scroll_cur == 0) {
-            rom_menu_scroll_off -= 1;
-        } else {
-            rom_menu_scroll_cur -= 1;
-        }
-    }
-#endif
-
-    return;
-}
-
-
 //redraw the header & footer
 void redraw_template() {
 
-    _draw_template(disp_state.current_win);
+    _draw_template(menu_state.current_win_ptr);
+    return;
 }
 
 
 //redraw the body
 void redraw_menu() {
 
-    if (disp_state.current_win == main_win) _draw_main_menu();
-    if (disp_state.current_win == roms_win) _draw_roms_menu();
+    if (menu_state.current_win == MAIN) _draw_main_menu();
+    if (menu_state.current_win == ROMS) _draw_roms_menu();
+    return;
+}
+
+
+/*
+ *  NOTE: These functions expect to be called before `menu_state` is
+ *        updated to reflect the state after the input. Redraw the
+ *        screen separately.
+ */
+
+//user enters the main window
+void disp_main_entry() {
+
+    menu_state.current_win_ptr = main_win;
+    return;
+}
+
+
+//user exits the main window
+void disp_main_exit() {
+    return;
+}
+
+
+//user presses the down key inside the main window
+void disp_main_down() {
+    return;
+}
+
+
+//user presses the up key inside the main window
+void disp_main_up() {
+    return;
+}
+
+
+//user enters the ROMs window
+void disp_roms_entry() {
+
+    //update ROMs
+    update_roms();
+    _populate_roms_menu_opts();
+    
+    //update state
+    menu_state.current_win_ptr = roms_win;
+    roms_menu.scroll = 0;
+
+    return;
+}
+
+
+//user exits the ROMs window
+void disp_roms_exit() {
+    return;
+}
+
+
+//user presses the down key inside the ROMs window
+void disp_roms_down() {
+
+    int effective_body_sz_y = win.body_sz_y - WIN_HDR_LEN - 1;
+
+    //if already reached the bottom, ignore
+    if (menu_state.roms_menu_pos == roms_menu.opts.len - 1) return;
+
+    //if already on the bottom of the menu, scroll the menu down
+    if ((menu_state.roms_menu_pos - menu_state.roms_menu_off)
+        == (effective_body_sz_y - 1)) {
+
+        menu_state.roms_menu_off += 1;
+    }
+
+    return;
+}
+
+
+//user presses the up key inside the ROMs window
+void disp_roms_up() {
+
+    int effective_body_sz_y = win.body_sz_y - WIN_HDR_LEN - 1;
+
+    //if already reached the "BACK" option, ignore
+    if (menu_state.roms_menu_pos == -1) return;
+
+    //if already on the top of the menu, scroll the menu up
+    if (menu_state.roms_menu_pos == menu_state.roms_menu_off) {
+        menu_state.roms_menu_off -= 1;
+    }
+    
+    return;
+}
+
+
+//user presses the start/select/a key inside the ROMs window
+void disp_roms_select() {
+
+    //if on the "BACK" option, ignore    
+    if (menu_state.roms_menu_pos == -1) return;
+
+    //set the current position as active
+    roms_menu.is_active = true;
+
+    return;
 }
