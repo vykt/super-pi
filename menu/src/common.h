@@ -11,7 +11,7 @@
 
 //paths DEBUG
 //#define PATH_ROMS "/superpi/rom"
-#define PATH_ROMS "/home/vykt/projects/super-pi/superpi/menu/roms"
+#define PATH_ROMS "/home/vykt/projects/super-pi/menu/roms"
 
 //colours
 #define RESET   "\x1b[0m"

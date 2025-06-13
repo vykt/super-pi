@@ -11,11 +11,11 @@
 void init_ncurses();
 void fini_ncurses();
 
-//redraw the header & footer
-void redraw_template();
+//redraw the display
+void redraw();
 
-//redraw the body
-void redraw_menu();
+//refresh the active windpw
+void disp_refresh();
 
 //main window updates
 void disp_main_entry();
@@ -28,5 +28,6 @@ void disp_roms_entry();
 void disp_roms_exit();
 void disp_roms_down();
 void disp_roms_up();
+
 
 #endif

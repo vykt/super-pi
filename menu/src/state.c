@@ -22,15 +22,15 @@ struct menu_state menu_state;
 void init_menu_state() {
 
     //set window meta-data
-    menu_state.current_win = UNDEF;
+    menu_state.current_win = MAIN;
     menu_state.current_win_ptr = NULL;
 
     //set main menu data
     menu_state.main_menu_pos = 0;
 
     //set ROMs menu data
-    menu_state.roms_menu_pos = -1; //"BACK"
-    menu_state.roms_menu_off = -1; //"BACK"
+    menu_state.roms_menu_pos = 0; //"BACK"
+    menu_state.roms_menu_off = 0; //"BACK"
 
     return;
 }
@@ -47,15 +47,15 @@ void handle_activate() {
             disp_main_exit();
             disp_roms_entry();
             menu_state.current_win = ROMS;
-            menu_state.roms_menu_pos = -1;
-            menu_state.roms_menu_off = -1;
+            menu_state.roms_menu_pos = 0;
+            menu_state.roms_menu_off = 0;
             break;
 
         case 1: //INFO
             break;
 
         case 2: //EXIT
-            system("systemctl poweroff");
+            //system("systemctl poweroff");
             break;
         }
 
@@ -63,7 +63,7 @@ void handle_activate() {
     } else if (menu_state.current_win == ROMS) {
 
         switch(menu_state.roms_menu_pos) {
-            case -1: //BACK
+            case 0: //BACK
                 handle_exit();
                 break;
 
@@ -73,6 +73,8 @@ void handle_activate() {
         }
     } //end if
 
+    redraw();
+    disp_refresh();
     return;
 }
 
@@ -80,16 +82,8 @@ void handle_activate() {
 //handle window exit
 void handle_exit() {
     
-    //main menu case
-    if (menu_state.current_win == MAIN) {
-
-        disp_main_exit();
-        disp_roms_entry();
-        menu_state.current_win = ROMS;
-        menu_state.main_menu_pos = 0;
-
     //ROMs menu case
-    } else if (menu_state.current_win == ROMS) {
+    if (menu_state.current_win == ROMS) {
 
         disp_roms_exit();
         disp_main_entry();
@@ -97,6 +91,10 @@ void handle_exit() {
         menu_state.main_menu_pos = 0;
 
     } //end if
+
+    redraw();
+    disp_refresh();
+    return;
 }
 
 
@@ -114,10 +112,15 @@ void handle_down() {
     } else if (menu_state.current_win == ROMS) {
 
         disp_roms_down();
-        if (menu_state.roms_menu_pos != (rom_basenames.len -1))
+        if (menu_state.roms_menu_pos
+            != (ROMS_MENU_OPTS + rom_basenames.len - 1))
             menu_state.roms_menu_pos += 1;
 
     } //end if
+
+    redraw();
+    disp_refresh();
+    return;
 }
 
 
@@ -135,9 +138,13 @@ void handle_up() {
     } else if (menu_state.current_win == ROMS) {
 
         disp_roms_up();
-        if (menu_state.roms_menu_pos != -1) {
+        if (menu_state.roms_menu_pos != 0) {
             menu_state.roms_menu_pos -= 1;
         }
 
     } //end if
+
+    redraw();
+    disp_refresh();
+    return;
 }

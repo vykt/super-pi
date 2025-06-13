@@ -45,8 +45,8 @@
 struct scrn {
 
     //dimension constraints
-    /* const */ int min_y; //16
-    /* const */ int min_x; //32
+    int min_y;
+    int min_x;
 
     //dimensions
     int sz_y;
@@ -57,10 +57,10 @@ struct scrn {
 struct win {
 
     //dimension constraints
-    int max_y; //32
-    int max_x; //96
-    int min_y; //14
-    int min_x; //30
+    int max_y;
+    int max_x;
+    int min_y;
+    int min_x;
 
     //dimensions
     int sz_y;
@@ -101,9 +101,6 @@ struct menu {
 
 // -- [globals] --
 
-//menu state
-struct menu_state menu_state;
-
 //screen & window data
 static struct scrn scrn;
 static struct win win;
@@ -114,7 +111,8 @@ static WINDOW * roms_win;
 
 //menues
 struct menu main_menu;
-struct menu roms_menu;
+struct menu roms_menu_0; //regular menu
+struct menu roms_menu_1; //ROMs
 
 
 // -- [text] --
@@ -125,7 +123,7 @@ static void _populate_sz_constraints() {
     scrn.min_y = 16;
     scrn.min_x = 32;
     win.max_y  = 32;
-    win.max_x  = 96;
+    win.max_x  = 80;
     win.min_y  = 14;
     win.min_x  = 30;
 
@@ -167,16 +165,16 @@ static void _populate_dimensions() {
     win.start_x = (scrn.sz_x / 2) - (win.sz_x / 2);
 
     //calculate window header starting position
-    win.hdr_start_y = win.start_y + 1;
-    win.hdr_start_x = win.start_x + (win.sz_x / 2) - (WIN_FTR_LEN / 2);
+    win.hdr_start_y = 1;
+    win.hdr_start_x = (win.sz_x / 2) - 9; //9 left of middle
 
     //calculate window footer starting position
-    win.ftr_start_y = win.start_y + win.sz_y - WIN_FTR_LEN - 1;
-    win.ftr_start_x = win.start_x + (win.sz_x / 2) - 8; //8 left of middle
+    win.ftr_start_y = win.sz_y - WIN_FTR_LEN - 1;
+    win.ftr_start_x = (win.sz_x / 2) - 8; //8 left of middle
 
     //calculate window body size & starting position
     win.body_start_y = win.hdr_start_y + WIN_HDR_LEN + 1;
-    win.body_start_x = win.start_x + (win.sz_x / 5);
+    win.body_start_x = (win.sz_x / 5);
 
     win.body_sz_y = win.ftr_start_y - 1 - win.body_start_y;
     win.body_sz_x = win.sz_x - ((win.sz_x / 5) * 2);
@@ -258,9 +256,9 @@ static void _populate_main_menu_opts() {
     char * main_opts[MAIN_MENU_OPTS] = {
         "PLAY",
         "INFO",
-        "EXIT"
+        "POWER OFF"
     };
-    size_t main_opts_sz[MAIN_MENU_OPTS] = {4, 4, 4};
+    size_t main_opts_sz[MAIN_MENU_OPTS] = {4, 4, 9};
 
 
     //reset the main menu options
@@ -309,11 +307,19 @@ static void _populate_roms_menu_opts() {
 
 
     //reset the ROMs menu options
-    _construct_opts(&roms_menu);
+    _construct_opts(&roms_menu_0);
+    _construct_opts(&roms_menu_1);
 
     //allocate a string buffer of updated entry size
     rom_opt_buf = malloc(win.body_sz_x + 2);
     if (rom_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
+
+    //populate the back option
+    _build_opt_buf("BACK", 4, win.body_sz_x, rom_opt_buf);
+
+    //append this entry
+    ret = cm_vct_apd(&roms_menu_0.opts, rom_opt_buf);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
     //populate options
     for (int i = 0; i < rom_basenames.len; ++i) {
@@ -327,7 +333,7 @@ static void _populate_roms_menu_opts() {
         _build_opt_buf(basename, len, win.body_sz_x, rom_opt_buf);
 
         //append this entry
-        ret = cm_vct_apd(&roms_menu.opts, rom_opt_buf);
+        ret = cm_vct_apd(&roms_menu_1.opts, rom_opt_buf);
         if (ret != 0) FATAL_FAIL(ERR_GENERIC)
     }
     
@@ -342,7 +348,8 @@ static void _populate_roms_menu_opts() {
 static void _teardown_rom_menu_opts() {
 
     //teardown the main menu options
-    _destruct_opts(&roms_menu);
+    _destruct_opts(&roms_menu_0);
+    _destruct_opts(&roms_menu_1);
     return;
 }
 
@@ -380,59 +387,24 @@ static void _fini_wins() {
     //release windows
     ret = delwin(roms_win);
     if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+    roms_win = NULL;
 
     ret = delwin(main_win);
     if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+    main_win = NULL;
 
     return;
 }
 
 
-//handle a terminal resize
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-void _handle_winch(int sig) {
-
-    int ret;
-
-
-    //release windows
-    _fini_wins();
-
-    //reset ncurses
-    ret = endwin();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    ret = refresh();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    ret = clear();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    //re-populate global dimensions
-    _populate_dimensions();
-    _populate_main_menu_opts();
-    _populate_roms_menu_opts();
-
-    //re-initialise windows
-    _init_wins();
-
-    return;
-}
-#pragma GCC diagnostic pop
-
-
-//initialise ncurses global state
-void init_ncurses() {
+//perform initialisation
+void _initialise() {
 
     int ret;
     void * ret_ptr;
-    __sighandler_t ret_hdlr;
 
-
+    
     //general setup
-    init_menu_state();
-
     ret_ptr = initscr();
     if (ret_ptr == NULL) FATAL_FAIL(ERR_GENERIC)
     
@@ -446,24 +418,117 @@ void init_ncurses() {
     if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
     ret = start_color();
-    if (ret == ERR) subsys_state.ncurses_good = false;   
-    
+    if (ret == ERR) subsys_state.ncurses_good = false;
+
     //populate globals
     _populate_sz_constraints();
     _populate_colours();
     _populate_dimensions();
+    _populate_main_menu_opts();
+
+    //setup root window
+    ret = bkgd(COLOR_PAIR(WHITE_BLACK));
+    if (ret == ERR) subsys_state.ncurses_good = false;
+
+
+    return;
+}
+
+
+//handle a terminal resize
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+void _handle_winch(int sig) {
+
+    int ret;
+
+
+    //erase screen contents
+    ret = erase();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+    ret = refresh();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
+    //release windows
+    _fini_wins();
+
+    //reset ncurses
+    ret = endwin();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
+#if 0
+    ret = refresh();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
+    ret = clear();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+#endif
+
+    //re-populate global dimensions
+    _initialise();
+
+    //re-initialise windows
+    _init_wins();
+    if (menu_state.current_win == MAIN)
+        menu_state.current_win_ptr = main_win;
+    if (menu_state.current_win == ROMS)
+        menu_state.current_win_ptr = roms_win;
+    if (menu_state.current_win == ROMS) _populate_roms_menu_opts();
+
+    return;
+}
+#pragma GCC diagnostic pop
+
+
+//initialise ncurses global state
+void init_ncurses() {
+
+    //int ret;
+    //void * ret_ptr;
+    __sighandler_t ret_hdlr;
+
+
+#if 0
+    //general setup
+    ret_ptr = initscr();
+    if (ret_ptr == NULL) FATAL_FAIL(ERR_GENERIC)
+    
+    ret = cbreak();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
+    ret = keypad(stdscr, false);
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
+    ret = noecho();
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
+    ret = start_color();
+    if (ret == ERR) subsys_state.ncurses_good = false;
+
+    //populate globals
+    _populate_sz_constraints();
+    _populate_colours();
+    _populate_dimensions();
+    _populate_main_menu_opts();
+#endif
+    _initialise();
 
     //register a SIGWINCH handler
     ret_hdlr = signal(SIGWINCH, _handle_winch);
     if (ret_hdlr == SIG_ERR)
         FATAL_FAIL("Failed to register a SIGWINCH handler.")
 
+#if 0
     //setup root window
     ret = bkgd(COLOR_PAIR(WHITE_BLACK));
     if (ret == ERR) subsys_state.ncurses_good = false;
+#endif
 
     //initialise windows
     _init_wins();
+
+    //update menu state
+    menu_state.current_win_ptr = main_win;
 
     return;
 }
@@ -541,7 +606,7 @@ static void _draw_template(WINDOW * window) {
         if (wattron(window, COLOR_PAIR(BLACK_WHITE)) == ERR) {
             subsys_state.ncurses_good = false;
         }
-        mvwprintw(window, y, x, "CONTROLLER %d: ", i);
+        mvwprintw(window, y, x, "CONTROLLER %d: ", i + 1);
         if (wattroff(window, COLOR_PAIR(BLACK_WHITE)) == ERR) {
             subsys_state.ncurses_good = false;
         }
@@ -588,8 +653,8 @@ static void _draw_main_menu() {
     char * next_opt;
 
 
-    y = win.start_y;
-    x = win.start_x;
+    y = win.body_start_y;
+    x = win.body_start_x;
 
     //for each main menu option
     for (int i = 0; i < MAIN_MENU_OPTS; ++i) {
@@ -614,60 +679,76 @@ static void _draw_roms_menu() {
 
     int y, x;
 
-    int range;
+    int list_sz, range;
     int effective_i;
     char * next_opt;
 
 
-    y = win.start_y;
-    x = win.start_x;
+    y = win.body_start_y;
+    x = win.body_start_x;
 
-    //draw the back option
+    //fetch the "BACK" option
+    next_opt = cm_vct_get_p(&roms_menu_0.opts, 0);
+    if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+
+    //display the "BACK" option
     if (menu_state.roms_menu_pos == 0) {
-        _draw_colour(main_win, WHITE_BLUE, y, x, "BACK");
+        _draw_colour(roms_win,
+                     roms_menu_0.is_active ? WHITE_RED : WHITE_BLUE,
+                     y, x, next_opt);
     } else {
-        _draw_colour(main_win, BLACK_WHITE, y, x, "BACK");
+        _draw_colour(roms_win, BLACK_WHITE, y, x, next_opt);
     }
 
     //for each ROM menu option
     y += 2;
-    range = (roms_menu.opts.len > win.body_sz_y)
-            ? win.body_sz_y : roms_menu.opts.len;
+    list_sz = win.body_sz_y - 2;
+    range = (roms_menu_1.opts.len > list_sz)
+             ? list_sz : roms_menu_1.opts.len;
     for (int i = 0; i < range; ++i) {
 
         //get an i that accounts for menu scroll
-        effective_i = roms_menu.scroll + i;
+        effective_i = roms_menu_1.scroll + i;
 
         //get the next option
-        next_opt = cm_vct_get_p(&main_menu.opts, effective_i);
+        next_opt = cm_vct_get_p(&roms_menu_1.opts, effective_i);
         if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next option
-        if (menu_state.roms_menu_pos == effective_i) {
-            _draw_colour(main_win,
-                         roms_menu.is_active ? WHITE_RED : WHITE_BLUE,
+        if (menu_state.roms_menu_pos - 1 == effective_i) {
+            _draw_colour(roms_win,
+                         roms_menu_1.is_active ? WHITE_RED : WHITE_BLUE,
                          y, x, next_opt);
         } else {
-            _draw_colour(main_win, BLACK_WHITE, y, x, next_opt);
+            _draw_colour(roms_win, BLACK_WHITE, y, x, next_opt);
         }
+
         y += 1;
     }
 }
 
 
-//redraw the header & footer
-void redraw_template() {
+//redraw the screen
+void redraw() {
 
+    werase(menu_state.current_win_ptr);
     _draw_template(menu_state.current_win_ptr);
+    if (menu_state.current_win == MAIN) _draw_main_menu();
+    if (menu_state.current_win == ROMS) _draw_roms_menu();
+
     return;
 }
 
 
-//redraw the body
-void redraw_menu() {
+//refresh the active window
+void disp_refresh() {
 
-    if (menu_state.current_win == MAIN) _draw_main_menu();
-    if (menu_state.current_win == ROMS) _draw_roms_menu();
+    int ret;
+
+
+    ret = wrefresh(menu_state.current_win_ptr);
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+
     return;
 }
 
@@ -713,7 +794,7 @@ void disp_roms_entry() {
     
     //update state
     menu_state.current_win_ptr = roms_win;
-    roms_menu.scroll = 0;
+    roms_menu_1.scroll = 0;
 
     return;
 }
@@ -728,16 +809,17 @@ void disp_roms_exit() {
 //user presses the down key inside the ROMs window
 void disp_roms_down() {
 
-    int effective_body_sz_y = win.body_sz_y - WIN_HDR_LEN - 1;
+    int list_sz = win.body_sz_y - 2;
 
     //if already reached the bottom, ignore
-    if (menu_state.roms_menu_pos == roms_menu.opts.len - 1) return;
+    if (menu_state.roms_menu_pos
+        == ROMS_MENU_OPTS + roms_menu_1.opts.len - 1) return;
 
     //if already on the bottom of the menu, scroll the menu down
-    if ((menu_state.roms_menu_pos - menu_state.roms_menu_off)
-        == (effective_body_sz_y - 1)) {
+    if (menu_state.roms_menu_pos
+        == ROMS_MENU_OPTS + roms_menu_1.scroll + list_sz - 1) {
 
-        menu_state.roms_menu_off += 1;
+        roms_menu_1.scroll += 1;
     }
 
     return;
@@ -747,14 +829,14 @@ void disp_roms_down() {
 //user presses the up key inside the ROMs window
 void disp_roms_up() {
 
-    int effective_body_sz_y = win.body_sz_y - WIN_HDR_LEN - 1;
-
     //if already reached the "BACK" option, ignore
-    if (menu_state.roms_menu_pos == -1) return;
+    if (menu_state.roms_menu_pos == 0) return;
 
     //if already on the top of the menu, scroll the menu up
-    if (menu_state.roms_menu_pos == menu_state.roms_menu_off) {
-        menu_state.roms_menu_off -= 1;
+    if (menu_state.roms_menu_pos
+        == ROMS_MENU_OPTS + roms_menu_1.scroll) {
+
+        if (roms_menu_1.scroll > 0) roms_menu_1.scroll -= 1;
     }
     
     return;
@@ -765,10 +847,10 @@ void disp_roms_up() {
 void disp_roms_select() {
 
     //if on the "BACK" option, ignore    
-    if (menu_state.roms_menu_pos == -1) return;
+    if (menu_state.roms_menu_pos == 0) return;
 
     //set the current position as active
-    roms_menu.is_active = true;
+    roms_menu_0.is_active = true;
 
     return;
 }

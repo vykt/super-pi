@@ -7,6 +7,9 @@
 //system headers
 #include <linux/limits.h>
 
+//external libraries
+#include <libevdev-1.0/libevdev/libevdev.h>
+
 //local headers
 #include "common.h"
 

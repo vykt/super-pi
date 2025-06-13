@@ -19,9 +19,6 @@
 #include "common.h"
 #include "input.h"
 
-//DEBUG
-#include <stdio.h>
-
 
 // -- [globals] --
 

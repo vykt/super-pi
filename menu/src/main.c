@@ -21,6 +21,14 @@
 #include "state.h"
 
 
+// -- [data] --
+
+//tracking whether a key is pressed
+bool is_down[KEY_REQ_NUM] = {0};
+
+
+// -- [text] --
+
 //dispatch a received input
 static void _dispatch_input(struct input_event * in_event) {
     
@@ -30,19 +38,39 @@ static void _dispatch_input(struct input_event * in_event) {
         switch(in_event->code) {
 
             case BTN_SOUTH:
-                handle_activate();
+                if (is_down[MENU_KEY_SOUTH] == false) {
+                    handle_activate();
+                    is_down[MENU_KEY_SOUTH] = true;
+                } else {
+                    is_down[MENU_KEY_SOUTH] = false;
+                }
                 break;
 
             case BTN_EAST:
-                handle_exit();
+                if (is_down[MENU_KEY_EAST] == false) {
+                    handle_exit();
+                    is_down[MENU_KEY_EAST] = true;
+                } else {
+                    is_down[MENU_KEY_EAST] = false;
+                }
                 break;
 
             case BTN_SELECT:
-                handle_activate();
+                if (is_down[MENU_KEY_SELECT] == false) {
+                    is_down[MENU_KEY_SELECT] = true;
+                    handle_activate();
+                } else {
+                    is_down[MENU_KEY_SELECT] = false;
+                }
                 break;
 
             case BTN_START:
-                handle_activate();
+                if (is_down[MENU_KEY_START] == false) {
+                    is_down[MENU_KEY_START] = true;
+                    handle_activate();
+                } else {
+                    is_down[MENU_KEY_START] = false;
+                }
                 break;
 
             default:
@@ -70,28 +98,23 @@ static void _dispatch_input(struct input_event * in_event) {
 
 int main() {
 
-    time_t prev, now;
+    int ret;
 
+    time_t prev, now;
+    struct input_event in_event;
+    
 
     //initialise core data
     init_subsys_state();
     init_udev();
     init_roms();
     init_js();
-
-
+    init_menu_state();
     init_ncurses();
-    sleep(3);
 
-    while (rom_node != NULL
-           && (start == true || rom_node != rom_basenames.head)) {
-
-        printf("rom: %s\n", (char *) rom_node->data);
-        rom_node = rom_node->next;
-        start = false;
-    }
-    
-    sleep(100);
+    //draw the original menu
+    redraw();
+    disp_refresh();
 
     //main loop
     prev = 0;
@@ -103,6 +126,8 @@ int main() {
 
             prev = now;
             update_js_state();
+            redraw();
+            disp_refresh();
 
             #if 0
             //dump meta
@@ -133,7 +158,14 @@ int main() {
 
         } //end periodically update devices
 
-        if (js_state.input_failed == false) process_input();
+
+        //process the next input
+        if (js_state.have_main_js == true
+            && js_state.input_failed == false) {
+
+            ret = next_input(&in_event);
+            if (ret == 1) _dispatch_input(&in_event);
+        }
         
     } while (usleep(10000) || true); //always true
 }

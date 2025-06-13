@@ -8,6 +8,7 @@
 // -- [macros] --
 
 #define MAIN_MENU_OPTS 3
+#define ROMS_MENU_OPTS 1
 
 
 // -- [data] --
@@ -15,7 +16,6 @@
 enum menu_window {
     MAIN,
     ROMS,
-    UNDEF
 };
 
 //menu state
@@ -32,6 +32,10 @@ struct menu_state {
     int roms_menu_pos;
     int roms_menu_off;
 };
+
+
+// -- [globals] --
+extern struct menu_state menu_state;
 
 
 // -- [text] --
