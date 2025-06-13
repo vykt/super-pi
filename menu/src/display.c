@@ -124,11 +124,11 @@ struct menu info_menu;
 static void _populate_sz_constraints() {
     
     scrn.min_y = 16;
-    scrn.min_x = 32;
+    scrn.min_x = 34;
     win.max_y  = 32;
     win.max_x  = 80;
     win.min_y  = 14;
-    win.min_x  = 30;
+    win.min_x  = 32;
 
     return;
 }
