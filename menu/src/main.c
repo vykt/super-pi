@@ -29,8 +29,38 @@ bool is_down[KEY_REQ_NUM] = {0};
 
 // -- [text] --
 
+//keep track of key presses & don't affect menu if a ROM is running
+static void _handle_key(int key, void(* cb)()) {
+
+    if (is_down[key] == false) { 
+        if (menu_state.rom_running == false) cb();
+        is_down[key] = true;
+    } else {
+        is_down[key] = false;
+    }
+
+    return;
+}
+
+
+//shutdown emulator & graphical server
+static void _exit_rom() {
+    
+    //update the ROM running state
+    menu_state.rom_running = false;
+
+    //call terminator script
+    system("exit_rom.sh");
+
+    return;
+}
+
+
 //dispatch a received input
 static void _dispatch_input(struct input_event * in_event) {
+
+    bool exit_rom = false;
+
     
     //if the input is a key type
     if (in_event->type == EV_KEY) {
@@ -38,39 +68,19 @@ static void _dispatch_input(struct input_event * in_event) {
         switch(in_event->code) {
 
             case BTN_SOUTH:
-                if (is_down[MENU_KEY_SOUTH] == false) {
-                    handle_activate();
-                    is_down[MENU_KEY_SOUTH] = true;
-                } else {
-                    is_down[MENU_KEY_SOUTH] = false;
-                }
+                _handle_key(MENU_KEY_SOUTH, handle_activate);
                 break;
 
             case BTN_EAST:
-                if (is_down[MENU_KEY_EAST] == false) {
-                    handle_exit();
-                    is_down[MENU_KEY_EAST] = true;
-                } else {
-                    is_down[MENU_KEY_EAST] = false;
-                }
+                _handle_key(MENU_KEY_EAST, handle_exit);
                 break;
 
             case BTN_SELECT:
-                if (is_down[MENU_KEY_SELECT] == false) {
-                    is_down[MENU_KEY_SELECT] = true;
-                    handle_activate();
-                } else {
-                    is_down[MENU_KEY_SELECT] = false;
-                }
+                _handle_key(MENU_KEY_SELECT, handle_activate);
                 break;
 
             case BTN_START:
-                if (is_down[MENU_KEY_START] == false) {
-                    is_down[MENU_KEY_START] = true;
-                    handle_activate();
-                } else {
-                    is_down[MENU_KEY_START] = false;
-                }
+                _handle_key(MENU_KEY_START, handle_activate);
                 break;
 
             default:
@@ -84,15 +94,31 @@ static void _dispatch_input(struct input_event * in_event) {
 
             case ABS_HAT0Y:
                 if (in_event->value < -0.25) {
-                    handle_up();
+                    if (menu_state.rom_running == false) handle_up();
                 } else if (in_event->value > 0.25) {
-                    handle_down();
+                    if (menu_state.rom_running == false) handle_down();
                 }
                 break;
 
         } //end switch
 
     } //end event type
+
+
+    //check if an exit from a running ROM was requested
+    if (menu_state.rom_running == true) {
+
+        //START + SELECT + TriggerL + TriggerR
+        exit_rom = is_down[MENU_KEY_SELECT]
+                   && is_down[MENU_KEY_START]
+                   && is_down[MENU_KEY_TL]
+                   && is_down[MENU_KEY_TR];
+
+        //perform the exit if requested
+        if (exit_rom == true) _exit_rom();
+    } 
+
+    return;
 }
 
 

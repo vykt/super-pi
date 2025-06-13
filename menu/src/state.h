@@ -37,6 +37,9 @@ struct menu_state {
 
     //info menu data
     int info_menu_pos;
+
+    //ROM running switch
+    bool rom_running;
 };
 
 

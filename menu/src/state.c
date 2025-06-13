@@ -35,6 +35,9 @@ void init_menu_state() {
     //set info menu data
     menu_state.info_menu_pos = 0;
 
+    //set the ROM running switch
+    menu_state.rom_running = false;
+
     return;
 }
 
@@ -75,6 +78,7 @@ void handle_activate() {
 
             default:
                 //TODO launch a ROM
+                menu_state.rom_running = true;
                 break;
         }
 
