@@ -4,6 +4,7 @@
 
 //system headers
 #include <signal.h>
+#include <sys/statvfs.h>
 
 //kernel headers
 #include <linux/limits.h>
@@ -108,11 +109,13 @@ static struct win win;
 //windows
 static WINDOW * main_win;
 static WINDOW * roms_win;
+static WINDOW * info_win;
 
 //menues
 struct menu main_menu;
 struct menu roms_menu_0; //regular menu
 struct menu roms_menu_1; //ROMs
+struct menu info_menu;
 
 
 // -- [text] --
@@ -215,9 +218,9 @@ static void _destruct_opts(struct menu * menu) {
 }
 
 
-//centralise the provided string inside the provided buffer
-static void _build_opt_buf(
-    char * str, size_t len, size_t max_len, char * buf) {
+//build a display line
+static void _build_line_buf(
+    char * str, size_t len, size_t max_len, char * buf, bool centered) {
 
     size_t diff_len;
 
@@ -230,9 +233,14 @@ static void _build_opt_buf(
     //if this string is too small
     if (len < max_len) {
         diff_len = (max_len - len) / 2;
-        memset(buf, ' ', diff_len);
-        memcpy(buf + diff_len, str, len);
-        memset(buf + diff_len + len, ' ', diff_len);
+        if (centered == true) {
+            memset(buf, ' ', diff_len);
+            memcpy(buf + diff_len, str, len);
+            memset(buf + diff_len + len, ' ', diff_len);
+        } else {
+            memcpy(buf, str, len);
+            memset(buf + len, ' ', diff_len * 2);
+        }
 
     //else this entry does not fit inside the option space
     } else {
@@ -247,7 +255,7 @@ static void _build_opt_buf(
 
 
 //populate main menu entries
-static void _populate_main_menu_opts() {
+static void _populate_main_menu() {
 
     int ret;
     char * main_opt_buf;
@@ -272,8 +280,9 @@ static void _populate_main_menu_opts() {
     for (int i = 0; i < MAIN_MENU_OPTS; ++i) {
 
         //build the option buffer
-        _build_opt_buf(
-            main_opts[i], main_opts_sz[i], win.body_sz_x, main_opt_buf);
+        _build_line_buf(
+            main_opts[i], main_opts_sz[i],
+            win.body_sz_x, main_opt_buf, true);
 
         //append this entry
         ret = cm_vct_apd(&main_menu.opts, main_opt_buf);
@@ -288,7 +297,7 @@ static void _populate_main_menu_opts() {
 
 
 //teardown ROMs menu entries
-static void _teardown_main_menu_opts() {
+static void _teardown_main_menu() {
     
     //teardown the main menu options
     _destruct_opts(&main_menu);
@@ -297,13 +306,13 @@ static void _teardown_main_menu_opts() {
 
 
 //populate ROMs menu entries
-static void _populate_roms_menu_opts() {
+static void _populate_roms_menu() {
 
     int ret;
 
     size_t len;
     char * basename;
-    char * rom_opt_buf;
+    char * roms_opt_buf;
 
 
     //reset the ROMs menu options
@@ -311,14 +320,14 @@ static void _populate_roms_menu_opts() {
     _construct_opts(&roms_menu_1);
 
     //allocate a string buffer of updated entry size
-    rom_opt_buf = malloc(win.body_sz_x + 2);
-    if (rom_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
+    roms_opt_buf = malloc(win.body_sz_x + 2);
+    if (roms_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
 
     //populate the back option
-    _build_opt_buf("BACK", 4, win.body_sz_x, rom_opt_buf);
+    _build_line_buf("BACK", 4, win.body_sz_x, roms_opt_buf, true);
 
     //append this entry
-    ret = cm_vct_apd(&roms_menu_0.opts, rom_opt_buf);
+    ret = cm_vct_apd(&roms_menu_0.opts, roms_opt_buf);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
     //populate options
@@ -330,26 +339,108 @@ static void _populate_roms_menu_opts() {
         len = strnlen(basename, NAME_MAX);
 
         //build the option buffer
-        _build_opt_buf(basename, len, win.body_sz_x, rom_opt_buf);
+        _build_line_buf(basename, len, win.body_sz_x, roms_opt_buf, false);
 
         //append this entry
-        ret = cm_vct_apd(&roms_menu_1.opts, rom_opt_buf);
+        ret = cm_vct_apd(&roms_menu_1.opts, roms_opt_buf);
         if (ret != 0) FATAL_FAIL(ERR_GENERIC)
     }
     
     //free the menu option buffer
-    free(rom_opt_buf);
+    free(roms_opt_buf);
 
     return;
 }
 
 
 //teardown ROM menu entries
-static void _teardown_rom_menu_opts() {
+static void _teardown_rom_menu() {
 
     //teardown the main menu options
     _destruct_opts(&roms_menu_0);
     _destruct_opts(&roms_menu_1);
+    return;
+}
+
+
+//populate info menu entries
+static void _populate_info_menu() {
+
+    int ret;
+    
+    char * info_opt_buf;
+    char * info_data_buf;
+
+    struct statvfs stat;
+    unsigned long free_mb;
+
+
+    //reset the info menu options
+    _construct_opts(&info_menu);
+
+    //allocate menu buffers
+    info_opt_buf = malloc(win.body_sz_x + 2); //2 for leeway :)
+    if (info_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
+
+    info_data_buf = malloc(win.body_sz_x + 2); //2 for leeway :)
+    if (info_data_buf == NULL) FATAL_FAIL(ERR_GENERIC)
+
+
+    //populate the back option
+    _build_line_buf("BACK", 4, win.body_sz_x, info_opt_buf, true);
+
+    //append this entry
+    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+
+    //populate the ROM count
+    snprintf(info_data_buf, win.body_sz_x, "ROMS:       %d",
+             rom_basenames.len);
+    _build_line_buf(info_data_buf, strnlen(info_data_buf, win.body_sz_x),
+                    win.body_sz_x, info_opt_buf, false);
+
+    //append this entry
+    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+
+    //populate disk space
+    ret = statvfs("/", &stat);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+    free_mb = (stat.f_bfree * stat.f_frsize)  / (1024 * 1024);
+    snprintf(info_data_buf, win.body_sz_x, "FREE SPACE: %lu MB", free_mb);
+    _build_line_buf(info_data_buf, strnlen(info_data_buf, win.body_sz_x),
+                    win.body_sz_x, info_opt_buf, false);
+
+    //append this entry
+    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+
+    //populate the version
+    snprintf(info_data_buf, win.body_sz_x, "VERSION:    %s", VERSION);
+    _build_line_buf(info_data_buf, strnlen(info_data_buf, win.body_sz_x),
+                    win.body_sz_x, info_opt_buf, false);
+
+    //append this entry
+    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+
+    //free the info option buffer
+    free(info_opt_buf);
+    free(info_data_buf);
+
+    return;
+}
+
+
+//teardown info menu entries
+static void _teardown_info_menu() {
+    
+    //teardown the info menu options
+    _destruct_opts(&info_menu);
     return;
 }
 
@@ -367,11 +458,17 @@ static void _init_wins() {
     roms_win  = newwin(win.sz_y, win.sz_x, win.start_y, win.start_x);
     if (roms_win == NULL) FATAL_FAIL(ERR_GENERIC);
 
+    info_win  = newwin(win.sz_y, win.sz_x, win.start_y, win.start_x);
+    if (info_win == NULL) FATAL_FAIL(ERR_GENERIC);
+
     //set window background colours
     ret = wbkgd(main_win, COLOR_PAIR(BLACK_WHITE));
     if (ret == ERR) subsys_state.ncurses_good = false;
 
     ret = wbkgd(roms_win, COLOR_PAIR(BLACK_WHITE));
+    if (ret == ERR) subsys_state.ncurses_good = false;
+
+    ret = wbkgd(info_win, COLOR_PAIR(BLACK_WHITE));
     if (ret == ERR) subsys_state.ncurses_good = false;
 
     return;
@@ -385,6 +482,10 @@ static void _fini_wins() {
 
 
     //release windows
+    ret = delwin(info_win);
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
+    info_win = NULL;
+
     ret = delwin(roms_win);
     if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
     roms_win = NULL;
@@ -424,7 +525,7 @@ void _initialise() {
     _populate_sz_constraints();
     _populate_colours();
     _populate_dimensions();
-    _populate_main_menu_opts();
+    _populate_main_menu();
 
     //setup root window
     ret = bkgd(COLOR_PAIR(WHITE_BLACK));
@@ -456,24 +557,21 @@ void _handle_winch(int sig) {
     ret = endwin();
     if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
-#if 0
-    ret = refresh();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    ret = clear();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-#endif
-
-    //re-populate global dimensions
+    //re-initialise ncurses
     _initialise();
 
     //re-initialise windows
     _init_wins();
     if (menu_state.current_win == MAIN)
         menu_state.current_win_ptr = main_win;
-    if (menu_state.current_win == ROMS)
+    if (menu_state.current_win == ROMS) {
         menu_state.current_win_ptr = roms_win;
-    if (menu_state.current_win == ROMS) _populate_roms_menu_opts();
+        _populate_roms_menu();
+    }
+    if (menu_state.current_win == INFO) {
+        menu_state.current_win_ptr = info_win;
+        _populate_info_menu();
+    }
 
     return;
 }
@@ -483,46 +581,16 @@ void _handle_winch(int sig) {
 //initialise ncurses global state
 void init_ncurses() {
 
-    //int ret;
-    //void * ret_ptr;
     __sighandler_t ret_hdlr;
 
 
-#if 0
-    //general setup
-    ret_ptr = initscr();
-    if (ret_ptr == NULL) FATAL_FAIL(ERR_GENERIC)
-    
-    ret = cbreak();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    ret = keypad(stdscr, false);
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    ret = noecho();
-    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
-
-    ret = start_color();
-    if (ret == ERR) subsys_state.ncurses_good = false;
-
-    //populate globals
-    _populate_sz_constraints();
-    _populate_colours();
-    _populate_dimensions();
-    _populate_main_menu_opts();
-#endif
+    //initialise ncurses
     _initialise();
 
     //register a SIGWINCH handler
     ret_hdlr = signal(SIGWINCH, _handle_winch);
     if (ret_hdlr == SIG_ERR)
         FATAL_FAIL("Failed to register a SIGWINCH handler.")
-
-#if 0
-    //setup root window
-    ret = bkgd(COLOR_PAIR(WHITE_BLACK));
-    if (ret == ERR) subsys_state.ncurses_good = false;
-#endif
 
     //initialise windows
     _init_wins();
@@ -728,6 +796,41 @@ static void _draw_roms_menu() {
 }
 
 
+//draw the info menu
+static void _draw_info_menu() {
+
+    int y, x;
+    char * next_opt;
+
+
+    y = win.body_start_y;
+    x = win.body_start_x;
+
+    //fetch the "BACK" option
+    next_opt = cm_vct_get_p(&info_menu.opts, 0);
+    if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+
+    //display the "BACK" option
+    _draw_colour(info_win,
+                 info_menu.is_active ? WHITE_RED : WHITE_BLUE,
+                 y, x, next_opt);
+
+    //for each info menu data line
+    y += 2;
+    for (int i = 0; i < INFO_MENU_DATA; ++i) {
+
+        //get the next data line
+        next_opt = cm_vct_get_p(&info_menu.opts, i + INFO_MENU_OPTS);
+        if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+
+        //display the next data line
+        _draw_colour(info_win, BLACK_WHITE, y, x, next_opt);
+
+        y += 1;
+    }
+}
+
+
 //redraw the screen
 void redraw() {
 
@@ -735,6 +838,7 @@ void redraw() {
     _draw_template(menu_state.current_win_ptr);
     if (menu_state.current_win == MAIN) _draw_main_menu();
     if (menu_state.current_win == ROMS) _draw_roms_menu();
+    if (menu_state.current_win == INFO) _draw_info_menu();
 
     return;
 }
@@ -790,7 +894,7 @@ void disp_roms_entry() {
 
     //update ROMs
     update_roms();
-    _populate_roms_menu_opts();
+    _populate_roms_menu();
     
     //update state
     menu_state.current_win_ptr = roms_win;
@@ -852,5 +956,37 @@ void disp_roms_select() {
     //set the current position as active
     roms_menu_0.is_active = true;
 
+    return;
+}
+
+
+//user enters the info window
+void disp_info_entry() {
+
+    //update info lines
+    update_roms();
+    _populate_info_menu();
+
+    //update state
+    menu_state.current_win_ptr = info_win;
+
+    return;
+}
+
+
+//user exits the info window
+void disp_info_exit() {
+    return;
+}
+
+
+//user presses the down key inside the info window
+void disp_info_down() {
+    return;
+}
+
+
+//user presses the up key inside the info window
+void disp_info_up() {
     return;
 }

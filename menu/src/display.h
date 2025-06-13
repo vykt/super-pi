@@ -29,5 +29,11 @@ void disp_roms_exit();
 void disp_roms_down();
 void disp_roms_up();
 
+//info window updates
+void disp_info_entry();
+void disp_info_exit();
+void disp_info_down();
+void disp_info_up();
+
 
 #endif

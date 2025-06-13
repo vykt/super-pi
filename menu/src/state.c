@@ -32,6 +32,9 @@ void init_menu_state() {
     menu_state.roms_menu_pos = 0; //"BACK"
     menu_state.roms_menu_off = 0; //"BACK"
 
+    //set info menu data
+    menu_state.info_menu_pos = 0;
+
     return;
 }
 
@@ -52,7 +55,10 @@ void handle_activate() {
             break;
 
         case 1: //INFO
-            break;
+            disp_main_exit();
+            disp_info_entry();
+            menu_state.current_win = INFO;
+            menu_state.info_menu_pos = 0;
 
         case 2: //EXIT
             //system("systemctl poweroff");
@@ -71,6 +77,15 @@ void handle_activate() {
                 //TODO launch a ROM
                 break;
         }
+
+    //info menu case
+    } else if (menu_state.current_win == INFO) {
+
+        disp_info_exit();
+        disp_main_entry();
+        menu_state.current_win = MAIN;
+        menu_state.main_menu_pos = 1;
+        
     } //end if
 
     redraw();
@@ -89,6 +104,14 @@ void handle_exit() {
         disp_main_entry();
         menu_state.current_win = MAIN;
         menu_state.main_menu_pos = 0;
+
+    //info menu case
+    } else if (menu_state.current_win == INFO) {
+
+        disp_info_exit();
+        disp_main_entry();
+        menu_state.current_win = MAIN;
+        menu_state.main_menu_pos = 1;
 
     } //end if
 

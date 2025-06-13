@@ -9,6 +9,8 @@
 
 #define MAIN_MENU_OPTS 3
 #define ROMS_MENU_OPTS 1
+#define INFO_MENU_OPTS 1
+#define INFO_MENU_DATA 3
 
 
 // -- [data] --
@@ -16,6 +18,7 @@
 enum menu_window {
     MAIN,
     ROMS,
+    INFO
 };
 
 //menu state
@@ -31,6 +34,9 @@ struct menu_state {
     //ROMs menu data
     int roms_menu_pos;
     int roms_menu_off;
+
+    //info menu data
+    int info_menu_pos;
 };
 
 

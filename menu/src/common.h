@@ -9,6 +9,8 @@
 
 // -- [macros] --
 
+#define VERSION "v1.0.0"
+
 //paths DEBUG
 //#define PATH_ROMS "/superpi/rom"
 #define PATH_ROMS "/home/vykt/projects/super-pi/menu/roms"
