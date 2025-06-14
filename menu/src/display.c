@@ -40,7 +40,7 @@
 #define WIN_FTR_LEN 4
 
 //stack draw buffer size
-#define DRAW_BUF_SZ 64
+#define DRAW_BUF_SZ NAME_MAX
 
 
 // -- [data] --
@@ -260,7 +260,7 @@ static void _build_line_buf(
 static void _populate_main_menu() {
 
     int ret;
-    char * main_opt_buf;
+    char draw_buf[DRAW_BUF_SZ];
 
 
     char * main_opts[MAIN_MENU_OPTS] = {
@@ -274,25 +274,18 @@ static void _populate_main_menu() {
     //reset the main menu options
     _construct_opts(&main_menu);
 
-    //allocate a menu option string buffer
-    main_opt_buf = malloc(win.body_sz_x + 2); //2 for leeway :)
-    if (main_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
-
     //populate options
     for (int i = 0; i < MAIN_MENU_OPTS; ++i) {
 
         //build the option buffer
         _build_line_buf(
             main_opts[i], main_opts_sz[i],
-            win.body_sz_x, main_opt_buf, true);
+            win.body_sz_x, draw_buf, true);
 
         //append this entry
-        ret = cm_vct_apd(&main_menu.opts, main_opt_buf);
+        ret = cm_vct_apd(&main_menu.opts, draw_buf);
         if (ret != 0) FATAL_FAIL(ERR_GENERIC)
     }
-
-    //free the menu option buffer
-    free(main_opt_buf);
 
     return;
 }
@@ -314,22 +307,18 @@ static void _populate_roms_menu() {
 
     size_t len;
     char * basename;
-    char * roms_opt_buf;
+    char draw_buf[DRAW_BUF_SZ];
 
 
     //reset the ROMs menu options
     _construct_opts(&roms_menu_0);
     _construct_opts(&roms_menu_1);
 
-    //allocate a string buffer of updated entry size
-    roms_opt_buf = malloc(win.body_sz_x + 2);
-    if (roms_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
-
     //populate the back option
-    _build_line_buf("BACK", 4, win.body_sz_x, roms_opt_buf, true);
+    _build_line_buf("BACK", 4, win.body_sz_x, draw_buf, true);
 
     //append this entry
-    ret = cm_vct_apd(&roms_menu_0.opts, roms_opt_buf);
+    ret = cm_vct_apd(&roms_menu_0.opts, draw_buf);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
     //populate options
@@ -341,16 +330,13 @@ static void _populate_roms_menu() {
         len = strnlen(basename, NAME_MAX);
 
         //build the option buffer
-        _build_line_buf(basename, len, win.body_sz_x, roms_opt_buf, false);
+        _build_line_buf(basename, len, win.body_sz_x, draw_buf, false);
 
         //append this entry
-        ret = cm_vct_apd(&roms_menu_1.opts, roms_opt_buf);
+        ret = cm_vct_apd(&roms_menu_1.opts, draw_buf);
         if (ret != 0) FATAL_FAIL(ERR_GENERIC)
     }
     
-    //free the menu option buffer
-    free(roms_opt_buf);
-
     return;
 }
 
@@ -703,8 +689,7 @@ static void _draw_template(WINDOW * window) {
         if (js_state.js[i].is_present == true) {
 
             //draw controller status
-            if (js_state.main_js_idx == i
-                && subsys_state.controller_good == false) {
+            if (js_state.js[i].is_good == false) {
                 _draw_colour(window, RED_WHITE, &y, &x, "?? ", 0, 3);
             } else {
                 _draw_colour(window, GREEN_WHITE, &y, &x, "OK ", 0, 3);

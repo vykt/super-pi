@@ -46,16 +46,6 @@
 
 // -- [data] --
 
-//macro-to-linux button mapping
-struct js_key {
-
-    int keycode;
-    char desc[KEY_DESC_LEN];
-
-    bool is_present;
-};
-
-
 //joystick global state
 struct js_single_state {
 
@@ -64,11 +54,12 @@ struct js_single_state {
     char model[PATH_MAX];
 
     bool is_present;
+    bool is_good;
     bool is_open;
 
     int evdev_fd;
+    bool keys[KEY_OPT_NUM];
     struct libevdev * evdev;
-    struct js_key keys[KEY_OPT_NUM];
 };
 
 

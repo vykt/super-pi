@@ -262,7 +262,7 @@ static void _update_js_devices() {
             if (str != NULL) _COPY_STR_JS(str, model)
             else _COPY_STR_JS("Generic controller", model);
 
-            //mark joystick as present
+            //mark joystick as present & good
             js_state.js[i].is_present = true;
 
 
@@ -286,45 +286,36 @@ static void _update_js_devices() {
 }
 
 
-//linux-to-macro button mapping for keys (+ description string)
-static inline int _lookup_key_desc(int keycode, const char ** desc) {
+//linux-to-macro button mapping for keys
+static inline int _lookup_key(int keycode) {
 
     switch (keycode) {
 
         case BTN_SOUTH:
-            *desc = "Bottom button";
             return MENU_KEY_SOUTH;
 
         case BTN_EAST:
-            *desc = "Right button";
             return MENU_KEY_EAST;
 
         case BTN_NORTH:
-            *desc = "Top button";
             return MENU_KEY_NORTH;
 
         case BTN_WEST:
-            *desc = "Left button";
             return MENU_KEY_WEST;
 
         case BTN_TL:
-            *desc = "Left bumper";
             return MENU_KEY_TL;
 
         case BTN_TR:
-            *desc = "Right bumper";
             return MENU_KEY_TR;
 
         case BTN_SELECT:
-            *desc = "Select";
             return MENU_KEY_SELECT;
 
         case BTN_START:
-            *desc = "Start";
             return MENU_KEY_START;
 
         default:
-            *desc = NULL;
             return -1;
 
     } //end switch
@@ -367,14 +358,11 @@ static void _open_js(int idx) {
     const char * key_desc;
 
 
-    //reset libevdev subsystem state
-    subsys_state.evdev_good = true;
-
     //open the joystick event device for nonblocking reading
     js_state.js[idx].evdev_fd = open(js_state.js[idx].evdev_path,
-                                       O_RDONLY | O_NONBLOCK);
+                                     O_RDONLY | O_NONBLOCK);
     if (js_state.js[idx].evdev_fd < 0) {
-        subsys_state.evdev_good = false;
+        js_state.js[idx].is_good = false;
         return;
     }
 
@@ -382,22 +370,16 @@ static void _open_js(int idx) {
     ret = libevdev_new_from_fd(js_state.js[idx].evdev_fd,
                                &js_state.js[idx].evdev);
     if (ret != 0) {
-        subsys_state.evdev_good = true;
-        goto _prepare_js_cleanup_fd;
+        js_state.js[idx].is_good = false;
+        goto _open_js_cleanup_fd;
     }
 
     //populate available button mappings
     for (int i = 0; i < KEY_MAX; i++) {        
 
         if (libevdev_has_event_code(js_state.js[idx].evdev, EV_KEY, i)) {
-            ret = _lookup_key_desc(i, &key_desc);
-
-            if (ret >= 0) {
-                strncpy(js_state.js[idx].keys[ret].desc,
-                        key_desc, KEY_DESC_LEN);
-                js_state.js[idx].keys[ret].keycode = ret;
-                js_state.js[idx].keys[ret].is_present = true;
-            }
+            ret = _lookup_key(i);
+            if (ret >= 0) js_state.js[idx].keys[ret] = true;
         }
     }
 
@@ -407,20 +389,15 @@ static void _open_js(int idx) {
         if (libevdev_has_event_code(js_state.js[idx].evdev, EV_ABS, i)) {
             ret = _lookup_axis_desc(i, &key_desc);
             
-            if (ret >= 0) {
-                strncpy(js_state.js[idx].keys[ret].desc,
-                        key_desc, KEY_DESC_LEN);
-                js_state.js[idx].keys[ret].keycode = ret;
-                js_state.js[idx].keys[ret].is_present = true;
-            }
+            if (ret >= 0) js_state.js[idx].keys[ret] = true;
         }
     }
 
     //check if all required buttons/axes are available
-    subsys_state.controller_good = true;
+    js_state.js[idx].is_good = true;
     for (int i = 0; i < KEY_REQ_NUM; ++i) {
-        if (js_state.js[idx].keys[i].is_present == false) {
-            subsys_state.controller_good = false;
+        if (js_state.js[idx].keys[i] == false) {
+            js_state.js[idx].is_good = false;
         }
     }
     js_state.js[idx].is_open = true;
@@ -429,24 +406,47 @@ static void _open_js(int idx) {
     return;
 
     //error return
-    _prepare_js_cleanup_fd:
+    _open_js_cleanup_fd:
     close(js_state.js[idx].evdev_fd);
     return;
 }
 
 
-//close a joystick event device & its associated libevdev context
-static void _teardown_js(int idx) {
-
+//release resources associated with an open joystick
+static void _close_js(int idx) {
+    
     //cleanup the libevdev context
     libevdev_free(js_state.js[idx].evdev);
     close(js_state.js[idx].evdev_fd);
 
-    //cleanup the key mappings
-    memset(js_state.js[idx].keys, 0, sizeof(struct js_key) * KEY_OPT_NUM);
-
     //mark this joystick as no longer open
     js_state.js[idx].is_open = false;
+
+    return;
+}
+
+
+//close a joystick event & its assoicated libevdev context
+static void _cleanup_js(int idx) {
+
+    //close the joystick
+    _close_js(idx);
+
+    //cleanup the key mappings
+    memset(js_state.js[idx].keys, 0, KEY_OPT_NUM);
+
+    return;
+}
+
+
+//populate keymap of a non-main joystuck
+static void _keymap_js(int idx) {
+
+    //open this joystick & populate its keymap
+    _open_js(idx);
+
+    //close the joystick without cleaning the keymap
+    _cleanup_js(idx);
 
     return;
 }
@@ -474,7 +474,7 @@ void update_js_state() {
     //if the main joystick just became not present, tear it down
     if (js_state.js[js_state.main_js_idx].is_open == true
         && js_state.js[js_state.main_js_idx].is_present == false)
-            _teardown_js(js_state.main_js_idx);
+            _cleanup_js(js_state.main_js_idx);
 
     //if the main joystick is not present
     if (js_state.js[js_state.main_js_idx].is_present == false) {
@@ -506,7 +506,6 @@ void update_js_state() {
 
             //try to setup twice before giving up
             for (int k = 0; k < 2; ++k) {
-            
                 _open_js(js_state.main_js_idx);
                 if (js_state.js[js_state.main_js_idx].is_open) {
                     js_state.have_main_js = true;
@@ -550,6 +549,16 @@ void update_js_state() {
     _update_js_state_success:
     js_state.have_main_js = true;
     js_state.input_failed = false;
+
+    //populate keymaps of other controllers
+    for (int i = 0; i < 4; ++i) {
+
+        //skip the main joystick & skipped joysticks
+        if (js_state.js[i].is_present == false
+            || skip_idx[i] == true || js_state.main_js_idx == i) continue;
+        _keymap_js(i);
+    }
+
     return;
 }
 

@@ -45,8 +45,6 @@ int int_clamp(int val, int min, int max) {
 void init_subsys_state() {
 
     subsys_state.udev_good       = true;
-    subsys_state.evdev_good      = true;
-    subsys_state.controller_good = true;
     subsys_state.rom_good        = true;
 
     return;

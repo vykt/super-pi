@@ -35,8 +35,6 @@
 //status of subsystems
 struct subsys_state {
     bool udev_good;
-    bool evdev_good;
-    bool controller_good;
     bool rom_good;
 };
 

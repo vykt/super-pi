@@ -33,7 +33,7 @@ bool is_down[KEY_REQ_NUM] = {0};
 static void _handle_key(int key, void(* cb)()) {
 
     if (is_down[key] == false) { 
-        if (menu_state.rom_running == false) cb();
+        if ((menu_state.rom_running == false) && (cb != NULL)) cb();
         is_down[key] = true;
     } else {
         is_down[key] = false;
@@ -45,12 +45,20 @@ static void _handle_key(int key, void(* cb)()) {
 
 //shutdown emulator & graphical server
 static void _exit_rom() {
-    
+
+    int ret;
+
+
     //update the ROM running state
     menu_state.rom_running = false;
 
     //call terminator script
-    system("exit_rom.sh");
+    ret = system("exit_rom.sh > /dev/null 2>&1 < /dev/null");
+    if (ret != -1) {
+        menu_state.rom_running = false;
+        redraw();
+        disp_refresh();
+    }
 
     return;
 }
@@ -81,6 +89,14 @@ static void _dispatch_input(struct input_event * in_event) {
 
             case BTN_START:
                 _handle_key(MENU_KEY_START, handle_activate);
+                break;
+
+            case BTN_TL:
+                _handle_key(MENU_KEY_TL, NULL);
+                break;
+
+            case BTN_TR:
+                _handle_key(MENU_KEY_TR, NULL);
                 break;
 
             default:
@@ -154,36 +170,7 @@ int main() {
             update_js_state();
             redraw();
             disp_refresh();
-
-            #if 0
-            //dump meta
-            printf("\nhave js: %s | ",
-                   js_state.have_main_js ? "true" : "false");
-            printf("main js: %d | controller_good: %s\n",
-                   js_state.main_js_idx,
-                   subsys_state.controller_good ? "true" : "false");
-
-            //dump keys
-            for (int i = 0; i < KEY_OPT_NUM; ++i) {
-                printf("key %d : %s\n",
-                i,
-                js_state.js[js_state.main_js_idx].keys[i].is_present
-                ? "true" : "false");
-            }
-
-
-            //dump controllers
-            for (int i = 0; i < 4; ++i) {
-                printf("js %d: present: %s, event: %s\n",
-                       i,
-                       js_state.js[i].is_present ? "true" : "false",
-                       js_state.js[i].is_present
-                       ? js_state.js[i].evdev_path : "<none>");
-            }
-            #endif
-
-        } //end periodically update devices
-
+        }
 
         //process the next input
         if (js_state.have_main_js == true
