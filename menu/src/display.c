@@ -35,9 +35,12 @@
 //generic error string
 #define ERR_GENERIC "Ncurses encountered a fatal error."
 
-//main menu options
+//draw template sizes
 #define WIN_HDR_LEN 1
 #define WIN_FTR_LEN 4
+
+//menu sizes
+#define INFO_STATIC_LEN 3
 
 //stack draw buffer size
 #define DRAW_BUF_SZ NAME_MAX
@@ -115,9 +118,10 @@ static WINDOW * info_win;
 
 //menues
 struct menu main_menu;
-struct menu roms_menu_0; //regular menu
+struct menu roms_menu_0; //"back" option
 struct menu roms_menu_1; //ROMs
-struct menu info_menu;
+struct menu info_menu_0; //"back" option
+struct menu info_menu_1; //info lines
 
 
 // -- [text] --
@@ -355,41 +359,48 @@ static void _teardown_rom_menu() {
 static void _populate_info_menu() {
 
     int ret;
-    
-    char * info_opt_buf;
-    char * info_data_buf;
+    int controller_count;
 
     struct statvfs stat;
     unsigned long free_mb;
+    
+    char draw_buf[NAME_MAX], line_buf[NAME_MAX];
+    char * key_desc[KEY_OPT_NUM] = {
+        "B / SOUTH:             %s",
+        "A / EAST:              %s",
+        "X / NORTH:             %s",
+        "Y / WEST:              %s",
+        "LEFT TRIGGER:          %s",
+        "RIGHT TRIGGER:         %s",
+        "SELECT:                %s",
+        "START:                 %s",
+        "D-PAD X-AXIS:          %s",
+        "D-PAD Y-AXIS:          %s",
+        "LEFT JOYSTICK X-AXIS:  %s",
+        "RIGHT JOYSTICK Y-AXIS: %s"
+    };
 
 
     //reset the info menu options
-    _construct_opts(&info_menu);
-
-    //allocate menu buffers
-    info_opt_buf = malloc(win.body_sz_x + 2); //2 for leeway :)
-    if (info_opt_buf == NULL) FATAL_FAIL(ERR_GENERIC)
-
-    info_data_buf = malloc(win.body_sz_x + 2); //2 for leeway :)
-    if (info_data_buf == NULL) FATAL_FAIL(ERR_GENERIC)
-
+    _construct_opts(&info_menu_0);
+    _construct_opts(&info_menu_1);
 
     //populate the back option
-    _build_line_buf("BACK", 4, win.body_sz_x, info_opt_buf, true);
+    _build_line_buf("BACK", 4, win.body_sz_x, draw_buf, true);
 
     //append this entry
-    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    ret = cm_vct_apd(&info_menu_0.opts, draw_buf);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
 
     //populate the ROM count
-    snprintf(info_data_buf, win.body_sz_x, "ROMS:       %d",
+    snprintf(line_buf, win.body_sz_x, "ROMS:       %d",
              rom_basenames.len);
-    _build_line_buf(info_data_buf, strnlen(info_data_buf, win.body_sz_x),
-                    win.body_sz_x, info_opt_buf, false);
+    _build_line_buf(line_buf, strnlen(line_buf, win.body_sz_x),
+                    win.body_sz_x, draw_buf, false);
 
     //append this entry
-    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
 
@@ -397,28 +408,78 @@ static void _populate_info_menu() {
     ret = statvfs("/", &stat);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
     free_mb = (stat.f_bfree * stat.f_frsize)  / (1024 * 1024);
-    snprintf(info_data_buf, win.body_sz_x, "FREE SPACE: %lu MB", free_mb);
-    _build_line_buf(info_data_buf, strnlen(info_data_buf, win.body_sz_x),
-                    win.body_sz_x, info_opt_buf, false);
+    snprintf(line_buf, win.body_sz_x, "FREE SPACE: %lu MB", free_mb);
+    _build_line_buf(line_buf, strnlen(line_buf, win.body_sz_x),
+                    win.body_sz_x, draw_buf, false);
 
     //append this entry
-    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
 
     //populate the version
-    snprintf(info_data_buf, win.body_sz_x, "VERSION:    %s", VERSION);
-    _build_line_buf(info_data_buf, strnlen(info_data_buf, win.body_sz_x),
-                    win.body_sz_x, info_opt_buf, false);
+    snprintf(line_buf, win.body_sz_x, "VERSION:    %s", VERSION);
+    _build_line_buf(line_buf, strnlen(line_buf, win.body_sz_x),
+                    win.body_sz_x, draw_buf, false);
 
     //append this entry
-    ret = cm_vct_apd(&info_menu.opts, info_opt_buf);
+    ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
     if (ret != 0) FATAL_FAIL(ERR_GENERIC)
 
 
-    //free the info option buffer
-    free(info_opt_buf);
-    free(info_data_buf);
+    //populate a newline
+    memset(draw_buf, 0, DRAW_BUF_SZ);
+    
+    //append this entry
+    ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
+    if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+
+    //populate controller keymaps
+    controller_count = 0;
+    for (int i = 0; i < 4; ++i) {
+
+        //skip this joystick if it isn't present
+        if (js_state.js[i].is_present == false) continue;
+
+        //add a new line for subsequent controllers
+        if (controller_count != 0) {
+            //populate a newline
+            memset(draw_buf, 0, DRAW_BUF_SZ);
+    
+            //append this entry
+            ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
+            if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+        }
+        controller_count += 1;
+
+        snprintf(line_buf, win.body_sz_x, "CONTROLLER %d KEYMAP:", i);
+        _build_line_buf(line_buf, strnlen(line_buf, win.body_sz_x),
+                        win.body_sz_x, draw_buf, true);
+
+        //append this entry
+        ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
+        if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+        //add all keys
+        for (int j = 0; j < KEY_OPT_NUM; ++j) {
+
+            //build the next key entry
+            #pragma GCC diagnostic push
+            #pragma GCC diagnostic ignored "-Wformat-security"
+            snprintf(line_buf, win.body_sz_x, key_desc[j],
+                     (js_state.js[i].keys[j] == true) ? "YES" : "NO");
+            #pragma GCC diagnostic pop
+            _build_line_buf(line_buf, strnlen(line_buf, win.body_sz_x),
+                            win.body_sz_x, draw_buf, false);
+
+            //append this entry
+            ret = cm_vct_apd(&info_menu_1.opts, draw_buf);
+            if (ret != 0) FATAL_FAIL(ERR_GENERIC)
+
+        } //end add all keys
+
+    } //end populate controller keymaps
 
     return;
 }
@@ -428,7 +489,9 @@ static void _populate_info_menu() {
 static void _teardown_info_menu() {
     
     //teardown the info menu options
-    _destruct_opts(&info_menu);
+    _destruct_opts(&info_menu_0);
+    _destruct_opts(&info_menu_1);
+
     return;
 }
 
@@ -650,10 +713,10 @@ static int _get_roms_menu_opt_colour(int pos, int cur_pos) {
 }
 
 
-static int _get_submenu_sz(int menu_sz) {
+static int _get_submenu_sz(struct menu * menu_0, struct menu * menu_1) {
 
-    int submenu_sz = win.body_sz_y - menu_sz - 1;
-    return (roms_menu_1.opts.len > submenu_sz)
+    int submenu_sz = win.body_sz_y - menu_0->opts.len - 1;
+    return (menu_1->opts.len > submenu_sz)
              ? submenu_sz : roms_menu_1.opts.len;
     
 }
@@ -763,7 +826,7 @@ static void _draw_roms_menu() {
 
 
     //for each ROM menu option
-    range = _get_submenu_sz(roms_menu_0.opts.len);
+    range = _get_submenu_sz(&roms_menu_0, &roms_menu_1);
     for (int i = 0; i < range; ++i) {
 
         //get an i that accounts for menu scroll
@@ -789,26 +852,33 @@ static void _draw_info_menu() {
     int y, x;
 
     int colour;
-    char * info_opt;
+    int range;
+    int scroll_i;
+
+    char * back_opt, * info_opt;
 
 
     y = win.body_start_y;
     x = win.body_start_x;
 
     //fetch the "BACK" option
-    info_opt = cm_vct_get_p(&info_menu.opts, 0);
-    if (info_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+    back_opt = cm_vct_get_p(&info_menu_0.opts, 0);
+    if (back_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
     //display the "BACK" option
     colour = _get_menu_opt_colour(0, menu_state.info_menu_pos);
-    _draw_colour(info_win, colour, &y, &x, info_opt, 2, 0);
+    _draw_colour(info_win, colour, &y, &x, back_opt, 2, 0);
 
 
     //for each info menu data line
-    for (int i = 0; i < INFO_MENU_DATA; ++i) {
+    range = _get_submenu_sz(&info_menu_0, &info_menu_1);
+    for (int i = 0; i < range; ++i) {
+
+        //get an i that accounts for menu scroll
+        scroll_i = info_menu_1.scroll + i;
 
         //get the next data line
-        info_opt = cm_vct_get_p(&info_menu.opts, i + INFO_MENU_OPTS);
+        info_opt = cm_vct_get_p(&info_menu_1.opts, scroll_i);
         if (info_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next data line
@@ -901,7 +971,8 @@ void disp_roms_exit() {
 //user presses the down key inside the ROMs window
 void disp_roms_down() {
 
-    int list_sz = win.body_sz_y - 2;
+    int submenu_sz = _get_submenu_sz(&roms_menu_0, &roms_menu_1);
+
 
     //if already reached the bottom, ignore
     if (menu_state.roms_menu_pos
@@ -909,7 +980,7 @@ void disp_roms_down() {
 
     //if already on the bottom of the menu, scroll the menu down
     if (menu_state.roms_menu_pos
-        == ROMS_MENU_OPTS + roms_menu_1.scroll + list_sz - 1) {
+        == ROMS_MENU_OPTS + roms_menu_1.scroll + submenu_sz - 1) {
 
         roms_menu_1.scroll += 1;
     }
@@ -967,11 +1038,27 @@ void disp_info_exit() {
 
 //user presses the down key inside the info window
 void disp_info_down() {
+
+    int submenu_sz = _get_submenu_sz(&info_menu_0, &info_menu_1);
+
+
+    //if already reached the bottom, ignore
+    if (info_menu_1.scroll + submenu_sz == info_menu_1.opts.len)
+        return;
+
+    //scroll the menu down
+    info_menu_1.scroll += 1;
     return;
 }
 
 
 //user presses the up key inside the info window
 void disp_info_up() {
+
+    //if already reached the top, ignore
+    if (info_menu_1.scroll == 0) return;
+
+    //scroll the menu up
+    info_menu_1.scroll -= 1;
     return;
 }

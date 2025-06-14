@@ -10,7 +10,6 @@
 #define MAIN_MENU_OPTS 3
 #define ROMS_MENU_OPTS 1
 #define INFO_MENU_OPTS 1
-#define INFO_MENU_DATA 3
 
 
 // -- [data] --
@@ -37,6 +36,7 @@ struct menu_state {
 
     //info menu data
     int info_menu_pos;
+    int info_menu_off;
 
     //ROM running switch
     bool rom_running;

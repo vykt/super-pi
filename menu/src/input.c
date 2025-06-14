@@ -61,6 +61,7 @@ void init_js() {
 
     js_state.have_main_js = true;
     js_state.main_js_idx  = 0;
+
     return;
 }
 
@@ -377,7 +378,9 @@ static void _open_js(int idx) {
     //populate available button mappings
     for (int i = 0; i < KEY_MAX; i++) {        
 
-        if (libevdev_has_event_code(js_state.js[idx].evdev, EV_KEY, i)) {
+        if (libevdev_has_event_code(
+                js_state.js[idx].evdev, EV_KEY, i)) {
+
             ret = _lookup_key(i);
             if (ret >= 0) js_state.js[idx].keys[ret] = true;
         }
@@ -388,7 +391,7 @@ static void _open_js(int idx) {
 
         if (libevdev_has_event_code(js_state.js[idx].evdev, EV_ABS, i)) {
             ret = _lookup_axis_desc(i, &key_desc);
-            
+        
             if (ret >= 0) js_state.js[idx].keys[ret] = true;
         }
     }
@@ -446,7 +449,7 @@ static void _keymap_js(int idx) {
     _open_js(idx);
 
     //close the joystick without cleaning the keymap
-    _cleanup_js(idx);
+    _close_js(idx);
 
     return;
 }

@@ -1,6 +1,7 @@
 //C standard library
 #include <stdio.h>
 #include <time.h>
+#include <pwd.h>
 
 //system headers
 #include <unistd.h>
@@ -138,13 +139,35 @@ static void _dispatch_input(struct input_event * in_event) {
 }
 
 
+//drop privileges
+static void _drop_privilege() {
+
+    int ret;
+    struct passwd * pw;
+
+
+    //get the passwd struct for the super-pi user
+    pw = getpwnam(USER);
+    if (pw == NULL) FATAL_FAIL("Failed to find the Super-Pi user.");
+
+    //switch the user id
+    ret = setuid(pw->pw_uid);
+    if (ret != 0) FATAL_FAIL("Failed to drop privileges to the Super-PI user.");
+
+    return;
+}
+
+
 int main() {
 
     int ret;
 
     time_t prev, now;
     struct input_event in_event;
-    
+
+
+    //drop root privileges
+    _drop_privilege();
 
     //initialise core data
     init_subsys_state();

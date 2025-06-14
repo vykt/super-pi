@@ -7,6 +7,7 @@
 //local headers
 #include "data.h"
 #include "display.h"
+#include "input.h"
 #include "state.h"
 
 
@@ -29,11 +30,12 @@ void init_menu_state() {
     menu_state.main_menu_pos = 0;
 
     //set ROMs menu data
-    menu_state.roms_menu_pos = 0; //"BACK"
-    menu_state.roms_menu_off = 0; //"BACK"
+    menu_state.roms_menu_pos = 0;
+    menu_state.roms_menu_off = 0;
 
     //set info menu data
     menu_state.info_menu_pos = 0;
+    menu_state.info_menu_off = 0;
 
     //ROM running switch
     menu_state.rom_running = false;
@@ -143,6 +145,11 @@ void handle_down() {
             != (ROMS_MENU_OPTS + rom_basenames.len - 1))
             menu_state.roms_menu_pos += 1;
 
+    //info menu case
+    } else if (menu_state.current_win == INFO) {
+
+        disp_info_down();
+
     } //end if
 
     redraw();
@@ -168,6 +175,11 @@ void handle_up() {
         if (menu_state.roms_menu_pos != 0) {
             menu_state.roms_menu_pos -= 1;
         }
+
+    //info menu case
+    } else if (menu_state.current_win == INFO) {
+
+        disp_info_up();
 
     } //end if
 

@@ -10,6 +10,7 @@
 // -- [macros] --
 
 #define VERSION "v1.0.0"
+#define USER "superpi"
 
 //paths DEBUG
 //#define PATH_ROMS "/superpi/rom"
