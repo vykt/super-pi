@@ -33,11 +33,14 @@
 #define BLUE_WHITE  7
 
 //generic error string
-#define ERR_GENERIC "Ncurses raised an error."
+#define ERR_GENERIC "Ncurses encountered a fatal error."
 
 //main menu options
 #define WIN_HDR_LEN 1
 #define WIN_FTR_LEN 4
+
+//stack draw buffer size
+#define DRAW_BUF_SZ 64
 
 
 // -- [data] --
@@ -95,7 +98,6 @@ struct menu {
 
     cm_vct opts;
     bool is_init;
-    bool is_active;
     int scroll;
 };
 
@@ -453,23 +455,23 @@ static void _init_wins() {
 
     //create windows
     main_win = newwin(win.sz_y, win.sz_x, win.start_y, win.start_x);
-    if (main_win == NULL) FATAL_FAIL(ERR_GENERIC);
+    if (main_win == NULL) FATAL_FAIL(ERR_GENERIC)
 
     roms_win  = newwin(win.sz_y, win.sz_x, win.start_y, win.start_x);
-    if (roms_win == NULL) FATAL_FAIL(ERR_GENERIC);
+    if (roms_win == NULL) FATAL_FAIL(ERR_GENERIC)
 
     info_win  = newwin(win.sz_y, win.sz_x, win.start_y, win.start_x);
-    if (info_win == NULL) FATAL_FAIL(ERR_GENERIC);
+    if (info_win == NULL) FATAL_FAIL(ERR_GENERIC)
 
     //set window background colours
     ret = wbkgd(main_win, COLOR_PAIR(BLACK_WHITE));
-    if (ret == ERR) subsys_state.ncurses_good = false;
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
     ret = wbkgd(roms_win, COLOR_PAIR(BLACK_WHITE));
-    if (ret == ERR) subsys_state.ncurses_good = false;
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
     ret = wbkgd(info_win, COLOR_PAIR(BLACK_WHITE));
-    if (ret == ERR) subsys_state.ncurses_good = false;
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
     return;
 }
@@ -519,7 +521,7 @@ void _initialise() {
     if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
     ret = start_color();
-    if (ret == ERR) subsys_state.ncurses_good = false;
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
     //populate globals
     _populate_sz_constraints();
@@ -529,7 +531,7 @@ void _initialise() {
 
     //setup root window
     ret = bkgd(COLOR_PAIR(WHITE_BLACK));
-    if (ret == ERR) subsys_state.ncurses_good = false;
+    if (ret == ERR) FATAL_FAIL(ERR_GENERIC)
 
 
     return;
@@ -620,26 +622,54 @@ void fini_ncurses() {
 
 
 //draw a single line, in colour
-static void _draw_colour(
-    WINDOW * win, int colour, int y, int x, char * str) {
+static void _draw_colour(WINDOW * win, int colour,
+                         int * y, int * x, char * str,
+                         int off_y, int off_x) {
 
     //enable a colour attribute
-    if (wattron(win, COLOR_PAIR(colour)) == ERR) {
-        subsys_state.ncurses_good = false;
-    }
+    if (wattron(win, COLOR_PAIR(colour)) == ERR)
+        FATAL_FAIL(ERR_GENERIC)
 
     //perform the draw
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wformat-security"
-    mvwprintw(win, y, x, str);
+    mvwprintw(win, *y, *x, str);
     #pragma GCC diagnostic pop
 
     //disable a colour attribute
-    if (wattroff(win, COLOR_PAIR(colour)) == ERR) {
-        subsys_state.ncurses_good = false;
-    }
+    if (wattroff(win, COLOR_PAIR(colour)) == ERR)
+        FATAL_FAIL(ERR_GENERIC)
+
+    //advance y and x
+    *y += off_y;
+    *x += off_x;
 
     return;
+}
+
+
+//return the colour for a menu option
+static int _get_menu_opt_colour(int pos, int cur_pos) {
+
+    return (cur_pos == pos) ? WHITE_BLUE : BLACK_WHITE;
+}
+
+
+//return the colour for a ROMs menu option
+static int _get_roms_menu_opt_colour(int pos, int cur_pos) {
+    
+    if (cur_pos == pos) {
+        return menu_state.rom_running ? WHITE_RED : WHITE_BLUE;
+    } else { return BLACK_WHITE; }
+}
+
+
+static int _get_submenu_sz(int menu_sz) {
+
+    int submenu_sz = win.body_sz_y - menu_sz - 1;
+    return (roms_menu_1.opts.len > submenu_sz)
+             ? submenu_sz : roms_menu_1.opts.len;
+    
 }
 
 
@@ -647,63 +677,45 @@ static void _draw_colour(
 static void _draw_template(WINDOW * window) {
 
     int y, x;
+    char draw_buf[DRAW_BUF_SZ] = {0};
 
 
     //draw the header
     y = win.hdr_start_y; x = win.hdr_start_x;
-    _draw_colour(window, BLACK_WHITE, y, x, "--- [");
-
-    x += 5;
-    _draw_colour(window, RED_WHITE, y, x, "SUPER");
-
-    x += 5;
-    _draw_colour(window, GREEN_WHITE, y, x, "-");
-
-    x += 1;
-    _draw_colour(window, BLUE_WHITE, y, x, "PI");
-
-    x += 2;
-    _draw_colour(window, BLACK_WHITE, y, x, "] ---");
+    _draw_colour(window, BLACK_WHITE, &y, &x, "--- [", 0, 5);
+    _draw_colour(window, RED_WHITE, &y, &x, "SUPER", 0, 5);
+    _draw_colour(window, GREEN_WHITE, &y, &x, "-", 0, 1);
+    _draw_colour(window, BLUE_WHITE, &y, &x, "PI", 0, 2);
+    _draw_colour(window, BLACK_WHITE, &y, &x, "] ---", 0, 5);
 
 
     //draw the footer - for each controller
     for (int i = 0; i < 4; ++i) {
 
-        //draw controller index
+        //reset the draw position
         y = win.ftr_start_y + i; x = win.ftr_start_x;
-        if (wattron(window, COLOR_PAIR(BLACK_WHITE)) == ERR) {
-            subsys_state.ncurses_good = false;
-        }
-        mvwprintw(window, y, x, "CONTROLLER %d: ", i + 1);
-        if (wattroff(window, COLOR_PAIR(BLACK_WHITE)) == ERR) {
-            subsys_state.ncurses_good = false;
-        }
+
+        //draw controller index
+        snprintf(draw_buf, DRAW_BUF_SZ, "CONTROLLER %d: ", i + 1);
+        _draw_colour(window, BLACK_WHITE, &y, &x, draw_buf, 0, 14);
         
         //if the controller is present
-        x += 14;
         if (js_state.js[i].is_present == true) {
 
             //draw controller status
             if (js_state.main_js_idx == i
                 && subsys_state.controller_good == false) {
-
-                _draw_colour(window, RED_WHITE, y, x, "?? ");
-                x += 3;
+                _draw_colour(window, RED_WHITE, &y, &x, "?? ", 0, 3);
             } else {
-                _draw_colour(window, GREEN_WHITE, y, x, "OK ");
-                x += 3;
+                _draw_colour(window, GREEN_WHITE, &y, &x, "OK ", 0, 3);
             }
 
-            //draw the main tag if this controller is present
+            //draw an additional tag
             if (js_state.main_js_idx == i) {
 
-                _draw_colour(window, BLACK_WHITE, y, x, "[");
-
-                x += 1;
-                _draw_colour(window, BLUE_WHITE, y, x, "M");
-
-                x += 1;
-                _draw_colour(window, BLACK_WHITE, y, x, "]");
+                _draw_colour(window, BLACK_WHITE, &y, &x, "[", 0, 1);
+                _draw_colour(window, BLUE_WHITE, &y, &x, "M", 0, 1);
+                _draw_colour(window, BLACK_WHITE, &y, &x, "]", 0, 1);
             }
             
         } //end if controller is present
@@ -718,7 +730,8 @@ static void _draw_template(WINDOW * window) {
 static void _draw_main_menu() {
 
     int y, x;
-    char * next_opt;
+    int colour;
+    char * main_opt;
 
 
     y = win.body_start_y;
@@ -728,17 +741,15 @@ static void _draw_main_menu() {
     for (int i = 0; i < MAIN_MENU_OPTS; ++i) {
 
         //get the next option
-        next_opt = cm_vct_get_p(&main_menu.opts, i);
-        if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+        main_opt = cm_vct_get_p(&main_menu.opts, i);
+        if (main_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next option
-        if (menu_state.main_menu_pos == i) {
-            _draw_colour(main_win, WHITE_BLUE, y, x, next_opt);
-        } else {
-            _draw_colour(main_win, BLACK_WHITE, y, x, next_opt);
-        }
-        y += 1;
+        colour = _get_menu_opt_colour(i, menu_state.main_menu_pos);
+        _draw_colour(main_win, colour, &y, &x, main_opt, 1, 0);
     }
+
+    return;
 }
 
 
@@ -747,52 +758,43 @@ static void _draw_roms_menu() {
 
     int y, x;
 
-    int list_sz, range;
-    int effective_i;
-    char * next_opt;
+    int colour;
+    int range;
+    int scroll_i;
+
+    char * back_opt, * roms_opt;
 
 
     y = win.body_start_y;
     x = win.body_start_x;
 
     //fetch the "BACK" option
-    next_opt = cm_vct_get_p(&roms_menu_0.opts, 0);
-    if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+    back_opt = cm_vct_get_p(&roms_menu_0.opts, 0);
+    if (back_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
     //display the "BACK" option
-    if (menu_state.roms_menu_pos == 0) {
-        _draw_colour(roms_win,
-                     roms_menu_0.is_active ? WHITE_RED : WHITE_BLUE,
-                     y, x, next_opt);
-    } else {
-        _draw_colour(roms_win, BLACK_WHITE, y, x, next_opt);
-    }
+    colour = _get_menu_opt_colour(0, menu_state.roms_menu_pos);
+    _draw_colour(roms_win, colour, &y, &x, back_opt, 2, 0);
+
 
     //for each ROM menu option
-    y += 2;
-    list_sz = win.body_sz_y - 2;
-    range = (roms_menu_1.opts.len > list_sz)
-             ? list_sz : roms_menu_1.opts.len;
+    range = _get_submenu_sz(roms_menu_0.opts.len);
     for (int i = 0; i < range; ++i) {
 
         //get an i that accounts for menu scroll
-        effective_i = roms_menu_1.scroll + i;
+        scroll_i = roms_menu_1.scroll + i;
 
         //get the next option
-        next_opt = cm_vct_get_p(&roms_menu_1.opts, effective_i);
-        if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+        roms_opt = cm_vct_get_p(&roms_menu_1.opts, scroll_i);
+        if (roms_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next option
-        if (menu_state.roms_menu_pos - 1 == effective_i) {
-            _draw_colour(roms_win,
-                         roms_menu_1.is_active ? WHITE_RED : WHITE_BLUE,
-                         y, x, next_opt);
-        } else {
-            _draw_colour(roms_win, BLACK_WHITE, y, x, next_opt);
-        }
-
-        y += 1;
+        colour = _get_roms_menu_opt_colour(
+                     scroll_i, menu_state.roms_menu_pos - 1);
+        _draw_colour(roms_win, colour, &y, &x, roms_opt, 1, 0);
     }
+
+    return;
 }
 
 
@@ -800,34 +802,35 @@ static void _draw_roms_menu() {
 static void _draw_info_menu() {
 
     int y, x;
-    char * next_opt;
+
+    int colour;
+    char * info_opt;
 
 
     y = win.body_start_y;
     x = win.body_start_x;
 
     //fetch the "BACK" option
-    next_opt = cm_vct_get_p(&info_menu.opts, 0);
-    if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+    info_opt = cm_vct_get_p(&info_menu.opts, 0);
+    if (info_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
     //display the "BACK" option
-    _draw_colour(info_win,
-                 info_menu.is_active ? WHITE_RED : WHITE_BLUE,
-                 y, x, next_opt);
+    colour = _get_menu_opt_colour(0, menu_state.info_menu_pos);
+    _draw_colour(info_win, colour, &y, &x, info_opt, 2, 0);
+
 
     //for each info menu data line
-    y += 2;
     for (int i = 0; i < INFO_MENU_DATA; ++i) {
 
         //get the next data line
-        next_opt = cm_vct_get_p(&info_menu.opts, i + INFO_MENU_OPTS);
-        if (next_opt == NULL) FATAL_FAIL(ERR_GENERIC)
+        info_opt = cm_vct_get_p(&info_menu.opts, i + INFO_MENU_OPTS);
+        if (info_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
         //display the next data line
-        _draw_colour(info_win, BLACK_WHITE, y, x, next_opt);
-
-        y += 1;
+        _draw_colour(info_win, BLACK_WHITE, &y, &x, info_opt, 1, 0);
     }
+
+    return;
 }
 
 
@@ -952,9 +955,6 @@ void disp_roms_select() {
 
     //if on the "BACK" option, ignore    
     if (menu_state.roms_menu_pos == 0) return;
-
-    //set the current position as active
-    roms_menu_0.is_active = true;
 
     return;
 }

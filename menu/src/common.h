@@ -38,7 +38,6 @@ struct subsys_state {
     bool evdev_good;
     bool controller_good;
     bool rom_good;
-    bool ncurses_good;
 };
 
 
