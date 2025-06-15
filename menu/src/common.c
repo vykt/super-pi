@@ -44,8 +44,9 @@ int int_clamp(int val, int min, int max) {
 //initialise global subsystem status struct 
 void init_subsys_state() {
 
-    subsys_state.udev_good       = true;
-    subsys_state.rom_good        = true;
+    subsys_state.udev_good   = true;
+    subsys_state.rom_good    = true;
+    subsys_state.execve_good = true;
 
     return;
 }

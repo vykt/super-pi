@@ -37,6 +37,7 @@
 struct subsys_state {
     bool udev_good;
     bool rom_good;
+    bool execve_good;
 };
 
 

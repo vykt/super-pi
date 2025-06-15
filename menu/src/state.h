@@ -37,20 +37,26 @@ struct menu_state {
     //info menu data
     int info_menu_pos;
     int info_menu_off;
-
-    //ROM running switch
-    bool rom_running;
 };
 
 
 // -- [globals] --
+
+//global menu state
 extern struct menu_state menu_state;
+
+//execve parameters
+extern char * const argv[1];
+extern char ** envp;
 
 
 // -- [text] --
 
 //initialise menu state
 void init_menu_state();
+
+//initialise execve parameters
+void init_execve_params();
 
 //handle inputs
 void handle_activate();

@@ -13,8 +13,12 @@
 
 // -- [globals] --
 
-//menu state
+//global menu state
 struct menu_state menu_state;
+
+//execve parameters
+char * const argv[] = {"/bin/sh"};
+char ** envp;
 
 
 // -- [text] --
@@ -37,9 +41,14 @@ void init_menu_state() {
     menu_state.info_menu_pos = 0;
     menu_state.info_menu_off = 0;
 
-    //ROM running switch
-    menu_state.rom_running = false;
+    return;
+}
 
+
+//initialise execve parameters
+void init_execve_params(char ** own_envp) {
+
+    envp = own_envp;
     return;
 }
 
@@ -79,8 +88,24 @@ void handle_activate() {
                 break;
 
             default:
-                //TODO launch a ROM
-                menu_state.rom_running = true;
+                //TODO launch ROM
+                fini_ncurses();
+                execve("/asdiandsnadiansd", argv, envp); //DEBUG
+
+                // -- if we reached here, execve failed
+
+                //re-initialise ncurses
+                init_ncurses();
+
+                //tell ncurses to draw the ROMs menu
+                disp_roms_entry();
+
+                //redraw
+                redraw();
+                disp_refresh();
+
+                //note that execve failed
+                subsys_state.execve_good = false;
                 break;
         }
 

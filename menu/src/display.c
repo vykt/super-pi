@@ -1,3 +1,11 @@
+/*
+ *  NOTE: Underestimating the complexity of the task: the movie.
+ *
+ *        This code does not need to be extended, so this implementation
+ *        will do. In the future however, an opcode based UI system
+ *        should be used instead.
+ */
+
 //C standard library
 #include <stdbool.h>
 #include <string.h>
@@ -39,8 +47,9 @@
 #define WIN_HDR_LEN 1
 #define WIN_FTR_LEN 4
 
-//menu sizes
+//miscellaneous menu constants
 #define INFO_STATIC_LEN 3
+#define INFO_KEY_STATE_OFF 18
 
 //stack draw buffer size
 #define DRAW_BUF_SZ NAME_MAX
@@ -366,18 +375,18 @@ static void _populate_info_menu() {
     
     char draw_buf[NAME_MAX], line_buf[NAME_MAX];
     char * key_desc[KEY_OPT_NUM] = {
-        "B / SOUTH:             %s",
-        "A / EAST:              %s",
-        "X / NORTH:             %s",
-        "Y / WEST:              %s",
-        "LEFT TRIGGER:          %s",
-        "RIGHT TRIGGER:         %s",
-        "SELECT:                %s",
-        "START:                 %s",
-        "D-PAD X-AXIS:          %s",
-        "D-PAD Y-AXIS:          %s",
-        "LEFT JOYSTICK X-AXIS:  %s",
-        "RIGHT JOYSTICK Y-AXIS: %s"
+        "B / SOUTH:        %s",
+        "A / EAST:         %s",
+        "X / NORTH:        %s",
+        "Y / WEST:         %s",
+        "LEFT TRIGGER      %s",
+        "RIGHT TRIGGER:    %s",
+        "SELECT:           %s",
+        "START:            %s",
+        "D-PAD X-AXIS      %s",
+        "D-PAD Y-AXIS:     %s",
+        "JOYSTICK X-AXIS:  %s",
+        "JOYSTICK Y-AXIS:  %s"
     };
 
 
@@ -453,7 +462,7 @@ static void _populate_info_menu() {
         }
         controller_count += 1;
 
-        snprintf(line_buf, win.body_sz_x, "CONTROLLER %d KEYMAP:", i);
+        snprintf(line_buf, win.body_sz_x, "CONTROLLER %d KEYMAP:", i + 1);
         _build_line_buf(line_buf, strnlen(line_buf, win.body_sz_x),
                         win.body_sz_x, draw_buf, true);
 
@@ -697,6 +706,34 @@ static void _draw_colour(WINDOW * win, int colour,
 }
 
 
+//draw a single line, in colour
+static void _draw_substr_colour(WINDOW * win, int colour,
+                                int * y, int * x,
+                                char * str, int len,
+                                int off_y, int off_x) {
+
+    //enable a colour attribute
+    if (wattron(win, COLOR_PAIR(colour)) == ERR)
+        FATAL_FAIL(ERR_GENERIC)
+
+    //perform the draw
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wformat-security"
+    mvwprintw(win, *y, *x, "%.*s", len, str);
+    #pragma GCC diagnostic pop
+
+    //disable a colour attribute
+    if (wattroff(win, COLOR_PAIR(colour)) == ERR)
+        FATAL_FAIL(ERR_GENERIC)
+
+    //advance y and x
+    *y += off_y;
+    *x += off_x;
+
+    return;
+}
+
+
 //return the colour for a menu option
 static int _get_menu_opt_colour(int pos, int cur_pos) {
 
@@ -708,7 +745,7 @@ static int _get_menu_opt_colour(int pos, int cur_pos) {
 static int _get_roms_menu_opt_colour(int pos, int cur_pos) {
     
     if (cur_pos == pos) {
-        return menu_state.rom_running ? WHITE_RED : WHITE_BLUE;
+        return subsys_state.execve_good ? WHITE_BLUE : WHITE_RED;
     } else { return BLACK_WHITE; }
 }
 
@@ -717,7 +754,7 @@ static int _get_submenu_sz(struct menu * menu_0, struct menu * menu_1) {
 
     int submenu_sz = win.body_sz_y - menu_0->opts.len - 1;
     return (menu_1->opts.len > submenu_sz)
-             ? submenu_sz : roms_menu_1.opts.len;
+             ? submenu_sz : menu_1->opts.len;
     
 }
 
@@ -874,6 +911,9 @@ static void _draw_info_menu() {
     range = _get_submenu_sz(&info_menu_0, &info_menu_1);
     for (int i = 0; i < range; ++i) {
 
+        //reset x coordinate
+        x = win.body_start_x;
+
         //get an i that accounts for menu scroll
         scroll_i = info_menu_1.scroll + i;
 
@@ -881,9 +921,31 @@ static void _draw_info_menu() {
         info_opt = cm_vct_get_p(&info_menu_1.opts, scroll_i);
         if (info_opt == NULL) FATAL_FAIL(ERR_GENERIC)
 
-        //display the next data line
-        _draw_colour(info_win, BLACK_WHITE, &y, &x, info_opt, 1, 0);
-    }
+        //draw a regular line
+        if ((scroll_i < INFO_STATIC_LEN)
+            || ((scroll_i - INFO_STATIC_LEN) % (KEY_OPT_NUM + 2) <= 1)) {
+
+            _draw_colour(info_win, BLACK_WHITE, &y, &x, info_opt, 1, 0);
+
+        //print a controller key availability    
+        } else {
+
+        //draw a key state
+        _draw_substr_colour(info_win, BLACK_WHITE, &y, &x,
+                            info_opt, INFO_KEY_STATE_OFF, 0,
+                            INFO_KEY_STATE_OFF);
+
+            //display the `YES` or `NO` state in an appropriate colour
+            if (info_opt[INFO_KEY_STATE_OFF] == 'Y') {
+                _draw_colour(info_win, GREEN_WHITE, &y, &x,
+                             info_opt + INFO_KEY_STATE_OFF, 1, 0);
+            } else if (info_opt[INFO_KEY_STATE_OFF] == 'N') {
+                _draw_colour(info_win, RED_WHITE, &y, &x,
+                             info_opt + INFO_KEY_STATE_OFF, 1, 0);
+            }
+        }
+        
+    } //end for each info menu line
 
     return;
 }
